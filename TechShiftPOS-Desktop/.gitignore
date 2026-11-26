@@ -1,0 +1,6 @@
+node_modules/
+pos-app/
+release/
+dist/
+*.log
+build/eula-lines.nsh

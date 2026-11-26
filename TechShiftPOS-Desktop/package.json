@@ -1,0 +1,78 @@
+{
+  "name": "techshift-pos",
+  "productName": "TechShift POS",
+  "version": "2.2.0",
+  "description": "TechShift POS desktop application",
+  "main": "main.js",
+  "author": "TechShift",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "stage": "node scripts/stage-pos.js",
+    "start": "electron .",
+    "dist": "npm run stage && electron-builder --win nsis",
+    "release": "npm run stage && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.techshift.pos",
+    "productName": "TechShift POS",
+    "copyright": "TechShift",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html",
+      "package.json",
+      "build/icon.png",
+      "build/InterVariable.woff2"
+    ],
+    "extraResources": [
+      {
+        "from": "pos-app",
+        "to": "pos"
+      }
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "TechShift-POS-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TechShift POS",
+      "uninstallDisplayName": "TechShift POS",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "GALAXY1438",
+        "repo": "POS"
+      }
+    ]
+  }
+}

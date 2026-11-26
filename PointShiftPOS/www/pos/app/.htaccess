@@ -1,0 +1,3 @@
+# Block ALL direct HTTP access to app/ — these are PHP classes, not web pages
+Order deny,allow
+Deny from all

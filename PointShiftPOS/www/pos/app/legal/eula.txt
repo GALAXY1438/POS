@@ -1,0 +1,147 @@
+TECHSHIFT POS - END USER LICENCE AGREEMENT
+Version 1.0
+Effective date: 21 November 2026
+
+Licensor: TechShift ("we", "us", "our"), a software developer in Kenya.
+Licensee: the person or business that installs, activates or uses TechShift POS ("you").
+
+Please read this agreement carefully before installing or using the software. By installing, activating or using TechShift POS you accept these terms. If you do not accept them, do not install or use the software.
+
+1. DEFINITIONS
+
+"Software" means the TechShift POS point-of-sale application, including its desktop shell, web application, database schema, documentation and any updates we provide.
+
+"Licence Key" means the unique activation key we issue to you, which is digitally signed and linked to one machine.
+
+"Machine ID" means the identifier the Software generates from the hardware and operating system of the computer on which it runs.
+
+"Perpetual Licence" means a licence that does not expire, subject to payment of the applicable one-time fee.
+
+"Subscription Licence" means a licence that is valid until its stated expiry date and must be renewed to continue using the Software.
+
+2. LICENCE GRANT
+
+2.1 We grant you a non-exclusive, non-transferable, revocable licence to install and use one copy of the Software on one computer per Licence Key, for your internal business purposes only.
+
+2.2 A Perpetual Licence remains valid for the version of the Software supplied to you and any updates we choose to make available to you, unless terminated under this agreement.
+
+2.3 A Subscription Licence remains valid until the expiry date recorded in your Licence Key. On renewal we will issue a replacement key for the same Machine ID.
+
+2.4 You may keep backup copies of the Software and your data for disaster recovery, provided the Software is not used from a backup copy on any additional computer.
+
+3. ACTIVATION AND MACHINE BINDING
+
+3.1 Each Licence Key is bound to the Machine ID captured when it is issued. The Software will not operate on a different computer unless we issue a new key for that Machine ID.
+
+3.2 If you replace or upgrade a computer, contact us with the new Machine ID. Transfers are at our discretion and may be subject to a fee.
+
+3.3 You must not attempt to bypass, disable or alter the activation, signature or expiry checks in the Software.
+
+4. SUBSCRIPTION TERM AND RENEWAL
+
+4.1 Subscription Licences are sold for the term stated on your invoice or quotation (for example, monthly or annually).
+
+4.2 We will notify you before expiry where possible. After the expiry date a short grace period of seven days applies. After that, the Software will remain locked until a renewal key is entered.
+
+4.3 Your data is not deleted when a subscription lapses. Access is suspended and resumes when the licence is renewed.
+
+5. RESTRICTIONS
+
+You must not:
+(a) copy, sell, rent, lease, sublicense, distribute or otherwise make the Software available to any third party, including another business or shop;
+(b) share, publish or reuse a Licence Key on more than one computer;
+(c) reverse engineer, decompile, disassemble or attempt to derive the source code, except to the extent permitted by law;
+(d) remove, obscure or alter any copyright, trade mark or licence notice;
+(e) use the Software to provide a commercial service to third parties without our written consent;
+(f) use the Software in breach of Kenyan law, including tax, data protection and consumer protection laws.
+
+6. OWNERSHIP AND INTELLECTUAL PROPERTY
+
+6.1 The Software, its source code, design, documentation and trade marks remain our property and that of our licensors.
+
+6.2 This agreement grants a licence only. It does not transfer ownership of the Software or any intellectual property rights.
+
+7. YOUR DATA AND BACKUPS
+
+7.1 All business data you enter (products, sales, customers, receipts) belongs to you and is stored on your computer and in your database. We do not access it remotely.
+
+7.2 You are responsible for maintaining backups. The Software includes a backup feature; you should use it regularly and store copies safely off the machine.
+
+7.3 We are not responsible for data loss caused by hardware failure, power loss, deletion, failed restores or failure to keep backups.
+
+8. SUPPORT AND UPDATES
+
+8.1 Support terms depend on your purchase: Perpetual Licences include the support period stated on your invoice. Subscription Licences include support for the active term.
+
+8.2 We may release updates at any time. Updates are subject to this agreement. We are not obliged to add features or maintain compatibility with unsupported operating systems.
+
+8.3 Remote assistance, if provided, is limited to the Software and does not include repair of your computer, printer, network or other third-party systems unless separately agreed.
+
+9. FEES, TAXES AND REFUNDS
+
+9.1 Fees are stated on your invoice or quotation and exclude taxes unless stated otherwise.
+
+9.2 Perpetual Licence fees are one-time. Subscription fees are payable in advance for each term and are due before renewal.
+
+9.3 Except where required by law, fees are non-refundable once a Licence Key has been issued and activated.
+
+9.4 Late or unpaid subscription fees may result in suspension of the Software until payment is received.
+
+10. WARRANTY AND DISCLAIMER
+
+10.1 We warrant that the Software will materially perform as described in the documentation for the period stated on your invoice, or 30 days if no period is stated.
+
+10.2 To the maximum extent permitted by law, the Software is otherwise provided "as is". We do not warrant uninterrupted or error-free operation, or that the Software will meet every requirement of your business.
+
+10.3 Nothing in this agreement excludes or limits any rights you have under Kenyan law that cannot lawfully be excluded.
+
+11. LIMITATION OF LIABILITY
+
+11.1 To the maximum extent permitted by law, we are not liable for indirect, incidental, special or consequential loss, loss of profit, loss of business, loss of data or business interruption.
+
+11.2 Our total liability arising from or relating to this agreement is limited to the fees you paid for the Software in the twelve months before the event giving rise to the claim.
+
+11.3 Nothing in this clause limits liability for fraud, wilful misconduct or any liability that cannot be limited by law.
+
+12. TERMINATION
+
+12.1 We may terminate this agreement immediately if you breach these terms, including copying, redistributing or sharing the Software or a Licence Key, or attempting to circumvent activation.
+
+12.2 On termination you must stop using the Software and delete all copies, except that you may retain backups of your own business data.
+
+12.3 Termination does not entitle you to a refund except where required by law.
+
+13. PRIVACY
+
+13.1 The Software operates locally. We do not collect your sales, customer or product data.
+
+13.2 The Software stores a licence file on your computer containing the Licence Key and Machine ID. You may be asked to send us the Machine ID to issue or renew a key.
+
+13.3 If you send us diagnostics or screenshots for support, we use them only to resolve your issue.
+
+14. GOVERNING LAW AND DISPUTES
+
+14.1 This agreement is governed by the laws of Kenya.
+
+14.2 The courts of Nairobi have exclusive jurisdiction over disputes arising from this agreement, unless we agree otherwise in writing.
+
+14.3 Before starting court proceedings, both parties agree to attempt to resolve the dispute in good faith within 30 days.
+
+15. GENERAL
+
+15.1 This agreement, together with your invoice or quotation, is the entire agreement between us on this subject.
+
+15.2 If any provision is found unenforceable, the remaining provisions continue in effect.
+
+15.3 We may update this agreement for future versions of the Software. The version accepted at installation is recorded by the Software.
+
+16. CONTACT
+
+TechShift
+Email: dantech1438@gmail.com
+Phone/WhatsApp: 0790554926, 0706039116
+Nairobi, Kenya
+
+17. ACCEPTANCE
+
+By clicking "I accept", activating a Licence Key, or installing or using the Software, you confirm that you have read, understood and agree to be bound by this agreement.

@@ -1,0 +1,8 @@
+# Local runtime and shop data — never committed
+runtime/
+data/
+logs/
+backups/
+setup/.db_ready
+www/pos/uploads/
+*.log

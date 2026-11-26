@@ -1,0 +1,15 @@
+# Only the two product folders are tracked; everything else in this
+# workspace (zips, scratch folders, tools) stays local.
+/*
+!/.gitignore
+!/.github
+!/README.md
+!/PointShiftPOS
+!/TechShiftPOS-Desktop
+!/keystore
+/keystore/gui-data/
+
+# Secrets — never commit
+/keystore/signing/license_private.pem
+/keystore/issued/
+/keystore/machine-ids.txt
