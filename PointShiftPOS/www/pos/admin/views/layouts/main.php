@@ -186,23 +186,6 @@ try {
             </a></li>
         </ul>
         <?php endif; ?>
-        <?php if ($_isSA): ?>
-        <div class="sidebar-section-label">Super Admin</div>
-        <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link" href="/pos/superadmin/dashboard.php">
-                <i class="fas fa-shield"></i> SA Dashboard
-            </a></li>
-            <li><a class="nav-link" href="/pos/superadmin/tenants.php">
-                <i class="fas fa-building"></i> Tenants
-            </a></li>
-            <li><a class="nav-link" href="/pos/superadmin/system.php">
-                <i class="fas fa-hard-drive"></i> System
-            </a></li>
-            <li><a class="nav-link" href="/pos/integrations.php">
-                <i class="fas fa-exchange-alt"></i> Integrations
-            </a></li>
-        </ul>
-        <?php endif; ?>
         <?php endif; ?>
     </nav>
 </aside>

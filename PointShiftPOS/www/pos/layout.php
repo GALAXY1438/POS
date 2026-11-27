@@ -92,14 +92,6 @@ try {
                 <i class="fas fa-sliders"></i> Settings
             </a></li>
         </ul>
-        <?php if ($_isSA): ?>
-        <div class="sidebar-section-label">Super Admin</div>
-        <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link" href="/pos/superadmin/dashboard.php">
-                <i class="fas fa-shield"></i> SA Dashboard
-            </a></li>
-        </ul>
-        <?php endif; ?>
     </nav>
 </aside>
 

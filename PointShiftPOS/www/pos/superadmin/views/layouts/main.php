@@ -58,12 +58,6 @@ $_self        = basename($_SERVER['PHP_SELF']);
                 <i class="fas fa-list-check"></i> Audit Logs
             </a></li>
         </ul>
-        <div class="sidebar-section-label">Quick Access</div>
-        <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link" href="/pos/admin/dashboard.php">
-                <i class="fas fa-arrow-right"></i> Admin Panel
-            </a></li>
-        </ul>
     </nav>
 </aside>
 
