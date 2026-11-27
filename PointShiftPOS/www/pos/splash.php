@@ -6,16 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TechShift POS</title>
     <style>
-        @font-face {
-            font-family: "Inter";
-            src: url("/pos/assets/fonts/InterVariable.woff2") format("woff2-variations");
-            font-weight: 100 900;
-            font-style: normal;
-            font-display: swap;
-        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+            font-family: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
             background: #0A0A0A;
             color: #FAFAFA;
             height: 100vh;

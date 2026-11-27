@@ -25,9 +25,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $customer_name    = trim($_POST['customer_name']        ?? '');
             $customer_phone   = trim($_POST['customer_phone']       ?? '');
 
+            $secCheck = PosSecurity::evaluateSale($items, $discount_percent);
+            if ($secCheck['required'] && !PosSecurity::approvalActive('sale')) {
+                echo json_encode([
+                    'success'        => false,
+                    'needs_approval' => true,
+                    'total'          => $secCheck['total'],
+                    'message'        => 'This sale needs manager approval.',
+                ]);
+                exit();
+            }
+
             $result = $posController->createOrder($items, $payment_method, $amount_received, $discount_percent, $customer_name, $customer_phone);
 
             if ($result['success']) {
+                PosSecurity::clearApproval();
                 $oid = $result['order_id'] ?? 0;
                 try {
                     $db = Database::getInstance()->getConnection();
@@ -72,6 +84,7 @@ $categories = $posController->getCategories();
 $db      = Database::getInstance()->getConnection();
 $taxRow  = $db->query("SELECT setting_value FROM store_settings WHERE setting_key='tax_rate' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $taxRate = (float)($taxRow['setting_value'] ?? 0);
+$openShift = ShiftManager::current();
 
 // Store settings for receipt
 $storeSettings = [];
@@ -715,6 +728,17 @@ ob_start();
     ----------------------------------- -->
     <div class="cart-pane">
 
+        <?php if (!$openShift): ?>
+        <div style="margin:8px 10px 0;padding:7px 10px;border:1px solid var(--border-color);border-left:3px solid var(--warning);border-radius:8px;background:var(--bg-surface-2);font-size:.72rem;color:var(--text-secondary);">
+            <i class="fas fa-clock me-1"></i>No open shift — <a href="/pos/shift_register.php" style="font-weight:600;">open your shift</a> before selling.
+        </div>
+        <?php else: ?>
+        <div style="margin:8px 10px 0;padding:7px 10px;border:1px solid var(--border-color);border-left:3px solid var(--success);border-radius:8px;background:var(--bg-surface-2);font-size:.72rem;color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center;">
+            <span><i class="fas fa-clock me-1"></i>Shift open since <?php echo htmlspecialchars(date('H:i', strtotime($openShift['opened_at']))); ?></span>
+            <a href="/pos/shift_register.php" style="font-weight:600;">Close</a>
+        </div>
+        <?php endif; ?>
+
         <!-- Header -->
         <div class="cart-pane-head">
             <div class="cart-pane-head-title">
@@ -763,12 +787,22 @@ ob_start();
             </div>
             <div class="tot-row">
                 <span class="disc-wrap">
-                    Discount
-                    <input type="number" id="discount" class="disc-inp" value="0" min="0" max="100"
-                           oninput="discountPct=parseFloat(this.value)||0;updateTotals();">
-                    <span style="font-size:.7rem;color:var(--text-muted);">%</span>
+                    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.76rem;font-weight:500;">
+                        <input type="checkbox" id="bargain-chk" onchange="toggleBargain(this.checked)"
+                               style="width:14px;height:14px;accent-color:var(--text-primary);cursor:pointer;">
+                        Bargain discount
+                    </label>
                 </span>
                 <span class="tot-val" id="pos-disc" style="color:var(--success);">-<?php echo $sym; ?>0.00</span>
+            </div>
+            <div id="bargain-panel" style="display:none;margin:4px 0 10px;padding:8px 10px;border:1px dashed var(--border-color);border-radius:var(--radius);background:var(--bg-surface-2);">
+                <label style="font-size:.68rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">
+                    Agreed price (what the customer pays)
+                </label>
+                <input type="number" id="bargain-amount" min="0" step="0.01" placeholder="0.00"
+                       oninput="applyBargain()"
+                       style="font-size:.82rem;padding:6px 10px;border:1px solid var(--border-color);border-radius:var(--radius);width:100%;background:var(--bg-surface);">
+                <div id="bargain-hint" style="font-size:.68rem;color:var(--text-subtle);margin-top:5px;"></div>
             </div>
             <?php if ($taxRate > 0): ?>
             <div class="tot-row">
@@ -931,6 +965,7 @@ const RECEIPT_AUTO_PRINT = <?php echo json_encode(($storeSettings['receipt_auto_
 
 let cart        = [];
 let discountPct = 0;
+let bargainOn   = false;
 let curPay      = 'cash';
 let stkRef      = null;
 let pollTimer   = null;
@@ -958,7 +993,11 @@ function addToCart(p) {
     renderCart();
 }
 
-function removeFromCart(id) {
+function removeFromCart(id, skipApproval) {
+    if (!skipApproval && window.POS_SECURITY && POS_SECURITY.config.removeApproval && POS_SECURITY.config.restricted && !POS_SECURITY.approved) {
+        POS_SECURITY.approve('remove').then(function (ok) { if (ok) removeFromCart(id, true); });
+        return;
+    }
     cart = cart.filter(i => i.id !== id);
     renderCart();
 }
@@ -980,7 +1019,11 @@ function changeQty(id, delta) {
     renderCart();
 }
 
-function clearCart() {
+function clearCart(skipApproval) {
+    if (!skipApproval && cart.length && window.POS_SECURITY && POS_SECURITY.config.removeApproval && POS_SECURITY.config.restricted && !POS_SECURITY.approved) {
+        POS_SECURITY.approve('remove').then(function (ok) { if (ok) clearCart(true); });
+        return;
+    }
     cart = [];
     stkRef = null;
     clearInterval(pollTimer);
@@ -1057,15 +1100,63 @@ function renderCart() {
 // TOTALS  � prices are TAX-INCLUSIVE
 // Tax shown as: total - (total / (1 + taxRate))
 // ----------------------------------------------
+function cartSubtotal() {
+    return cart.reduce((s,i)=>s+i.price*i.qty,0);
+}
+
+function toggleBargain(on) {
+    bargainOn = !!on;
+    const panel = document.getElementById('bargain-panel');
+    const input = document.getElementById('bargain-amount');
+    const hint  = document.getElementById('bargain-hint');
+    if (panel) panel.style.display = bargainOn ? 'block' : 'none';
+    if (!bargainOn) {
+        discountPct = 0;
+        if (input) input.value = '';
+        if (hint) hint.textContent = '';
+    } else {
+        if (input && input.value === '') input.value = cartSubtotal().toFixed(2);
+        applyBargain();
+        if (input) { input.focus(); input.select(); }
+    }
+    updateTotals();
+}
+
+// Derive the discount percentage from the price the customer actually agreed to pay.
+function applyBargain() {
+    const sub   = cartSubtotal();
+    const input = document.getElementById('bargain-amount');
+    const hint  = document.getElementById('bargain-hint');
+    const agreed = input ? parseFloat(input.value) : NaN;
+
+    if (sub <= 0 || !isFinite(agreed) || agreed < 0) {
+        discountPct = 0;
+        if (hint) hint.textContent = 'Enter the agreed price.';
+        return;
+    }
+    if (agreed > sub) {
+        discountPct = 0;
+        if (hint) hint.textContent = 'Agreed price is above the cart total (' + SYM + sub.toFixed(2) + ').';
+        return;
+    }
+    const discAmt = sub - agreed;
+    discountPct = sub > 0 ? (discAmt / sub) * 100 : 0;
+    if (hint) {
+        const pct = Math.round(discountPct * 100) / 100;
+        hint.textContent = 'Discount: -' + SYM + discAmt.toFixed(2) + ' (' + pct + '% off ' + SYM + sub.toFixed(2) + ')';
+    }
+}
+
 function getTotal() {
-    const sub  = cart.reduce((s,i)=>s+i.price*i.qty,0);
-    const disc = sub * discountPct / 100;
+    const sub  = cartSubtotal();
+    const disc = Math.round(sub * discountPct) / 100;
     return sub - disc;   // price already includes tax
 }
 
 function updateTotals() {
-    const sub    = cart.reduce((s,i)=>s+i.price*i.qty,0);
-    const disc   = sub * discountPct / 100;
+    const sub    = cartSubtotal();
+    if (bargainOn) applyBargain();
+    const disc   = Math.round(sub * discountPct) / 100;
     const tot    = sub - disc;
     // Extract VAT from total (tax-inclusive)
     const taxIncl = TAX_RATE > 0 ? tot - (tot / (1 + TAX_RATE)) : 0;
@@ -1288,6 +1379,10 @@ function startPolling() {
 // ----------------------------------------------
 function completeSale() {
     if(cart.length===0) return;
+    if (window.POS_SECURITY && POS_SECURITY.needsApproval(getTotal()) && !POS_SECURITY.saleApproved) {
+        POS_SECURITY.approve('sale', getTotal()).then(function (ok) { if (ok) completeSale(); });
+        return;
+    }
     const method=curPay, total=getTotal();
     let amtRecv=total, extra={};
 
@@ -1326,7 +1421,21 @@ function completeSale() {
     .then(r=>r.json()).then(data=>{
         btn.disabled=false; btn.innerHTML='<i class="fas fa-check-circle me-2"></i>Complete Sale <span style="font-size:.72rem;opacity:.7;margin-left:6px;">[Enter]</span>';
         btn.className='complete-btn';
+        if (data.needs_shift) {
+            posAlert('Open a shift before making sales. Use My shift in the menu.');
+            return;
+        }
+        if (data.needs_approval) {
+            if (window.POS_SECURITY) {
+                POS_SECURITY.saleApproved = false;
+                POS_SECURITY.approve('sale', data.total || getTotal()).then(function (ok) { if (ok) completeSale(); });
+            } else {
+                posAlert(data.message || 'Manager approval is required.');
+            }
+            return;
+        }
         if(data.success){
+            if (window.POS_SECURITY) POS_SECURITY.reset();
             if (RECEIPT_AUTO_PRINT && data.order_id) {
                 serverPrintReceipt(data.order_id).then(function(r){
                     if (!r.success) console.warn('Receipt print failed:', r.message);
@@ -1339,9 +1448,13 @@ function completeSale() {
                 
                 // CLEAR CART AFTER RECEIPT IS BUILT
                 cart=[];discountPct=0;stkRef=null;npRaw='';
+                bargainOn=false;
+                const bc=document.getElementById('bargain-chk'); if(bc)bc.checked=false;
+                const bp=document.getElementById('bargain-panel'); if(bp)bp.style.display='none';
+                const ba=document.getElementById('bargain-amount'); if(ba)ba.value='';
+                const bh=document.getElementById('bargain-hint'); if(bh)bh.textContent='';
                 clearInterval(pollTimer);
                 renderCart();
-                document.getElementById('discount').value='0';
                 document.getElementById('numpad-display').textContent='0.00';
                 document.getElementById('np-change').style.display='none';
                 ['mpesa-phone','mpesa-code','mpesa-paid','stripe-amount','stripe-ref','customer-name','customer-phone'].forEach(id=>{
@@ -1410,7 +1523,8 @@ function buildReceiptInWindow(order, method, amtRecv) {
         })),
         subtotal:       order.subtotal || cartItems.reduce((s,i)=>s+i.price*i.qty,0),
         discount:       order.discount || 0,
-        discountPercent: discountPct,
+        discountPercent: Math.round(discountPct * 100) / 100,
+        discountLabel:  bargainOn ? 'Bargain discount' : 'Discount',
         tax:            TAX_RATE > 0 ? (order.total||0) - ((order.total||0) / (1 + TAX_RATE)) : 0,
         total:          order.total || 0,
     });
@@ -1474,7 +1588,8 @@ function buildReceipt(order,method,amtRecv){
         })),
         subtotal:       order.subtotal || cart.reduce((s,i)=>s+i.price*i.qty,0),
         discount:       order.discount || 0,
-        discountPercent: discountPct,
+        discountPercent: Math.round(discountPct * 100) / 100,
+        discountLabel:  bargainOn ? 'Bargain discount' : 'Discount',
         tax:            TAX_RATE > 0 ? (order.total||0) - ((order.total||0) / (1 + TAX_RATE)) : 0,
         total:          order.total || 0,
     });
@@ -1566,6 +1681,8 @@ function posAlert(msg, ok){
     setTimeout(()=>{if(box)box.innerHTML='';}, ok ? 2500 : 5000);
 }
 </script>
+
+<?php include __DIR__ . '/../views/partials/pos_approval.php'; ?>
 
 <?php
 $content = ob_get_clean();

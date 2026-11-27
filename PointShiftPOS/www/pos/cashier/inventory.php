@@ -377,7 +377,7 @@ function showBarcode(barcode, name) {
 }
 function printBarcode() {
     const w = window.open('','','width=400,height=300');
-    w.document.write('<html><head><style>body{text-align:center;padding:20px;font-family:Arial;}</style></head><body>');
+    w.document.write('<html><head><style>body{text-align:center;padding:20px;font-family:"Segoe UI",Arial,sans-serif;}</style></head><body>');
     w.document.write('<p><strong>' + document.getElementById('bcProductName').textContent + '</strong></p>');
     w.document.write('<img src="' + document.getElementById('bcImage').src + '" style="max-width:100%;">');
     w.document.write('<p>' + document.getElementById('bcValue').textContent + '</p>');

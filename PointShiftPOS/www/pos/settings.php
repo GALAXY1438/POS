@@ -23,6 +23,17 @@ function settingsAjaxReply(string $message, string $type): void
     exit;
 }
 
+function settingsSaveKey(PDO $db, string $key, string $value): void
+{
+    $st = $db->prepare(
+        "INSERT INTO store_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON CONFLICT (setting_key) DO UPDATE
+         SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP"
+    );
+    $st->execute([$key, $value]);
+}
+
 // Handle flash messages from redirects
 $message = $_SESSION['settings_message'] ?? '';
 $message_type = $_SESSION['settings_message_type'] ?? '';
@@ -31,6 +42,10 @@ unset($_SESSION['settings_message'], $_SESSION['settings_message_type']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $redirect_tab = $_POST['redirect_tab'] ?? 'company';
+
+    if ($action !== '' && preg_match('/^(update_|save_|generate_|revoke_|unenroll_|restore_)/', $action)) {
+        AuditLog::log('settings.submitted', "Settings form submitted: {$action}.", ['form' => $action]);
+    }
 
     // ── Backup Restore ────────────────────────────────────────────────────
     if ($action === 'restore_backup') {
@@ -97,6 +112,138 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['settings_message'] = "System settings saved.";
         $_SESSION['settings_message_type'] = 'success';
         header("Location: settings.php?tab=system");
+        exit();
+    }
+
+    // ── Security / POS approvals ──────────────────────────────────────────
+    if ($action === 'save_security_policy') {
+        $limit = max(0, (float)($_POST['security_sale_limit'] ?? 0));
+        $remove = isset($_POST['security_remove_approval']) ? '1' : '0';
+        $mode = (string)($_POST['security_approval_mode'] ?? 'either');
+        if (!in_array($mode, ['either', 'fingerprint', 'barcode', 'otp'], true)) {
+            $mode = 'either';
+        }
+        $otpChannel = ($_POST['security_otp_channel'] ?? 'sms') === 'email' ? 'email' : 'sms';
+        $mPhone = trim((string)($_POST['security_manager_phone'] ?? ''));
+        $mEmail = trim((string)($_POST['security_manager_email'] ?? ''));
+        if ($mPhone !== '' && !preg_match('/^\+?[0-9][0-9\s\-]{6,20}$/', $mPhone)) {
+            $_SESSION['settings_message'] = 'Manager phone must look like 2547XXXXXXXX.';
+            $_SESSION['settings_message_type'] = 'danger';
+            header('Location: settings.php?tab=security');
+            exit();
+        }
+        if ($mEmail !== '' && !filter_var($mEmail, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['settings_message'] = 'Manager email is not valid.';
+            $_SESSION['settings_message_type'] = 'danger';
+            header('Location: settings.php?tab=security');
+            exit();
+        }
+        settingsSaveKey($db, 'security_sale_limit', number_format($limit, 2, '.', ''));
+        settingsSaveKey($db, 'security_remove_approval', $remove);
+        settingsSaveKey($db, 'security_approval_mode', $mode);
+        settingsSaveKey($db, 'security_otp_channel', $otpChannel);
+        settingsSaveKey($db, 'security_manager_phone', $mPhone);
+        settingsSaveKey($db, 'security_manager_email', $mEmail);
+        PosSecurity::resetCache();
+        AuditLog::log('security.policy_saved', "POS approval policy updated (limit {$limit}, mode {$mode}).", [
+            'sale_limit'      => $limit,
+            'remove_approval' => $remove,
+            'mode'            => $mode,
+            'otp_channel'     => $otpChannel,
+        ]);
+        $_SESSION['settings_message'] = 'Security controls saved.';
+        $_SESSION['settings_message_type'] = 'success';
+        header('Location: settings.php?tab=security');
+        exit();
+    }
+
+    if ($action === 'generate_approval_barcode') {
+        $token = 'TSPOS-APR-' . strtoupper(bin2hex(random_bytes(6)));
+        settingsSaveKey($db, 'security_barcode_token', $token);
+        settingsSaveKey($db, 'security_barcode_created_at', date('Y-m-d H:i:s'));
+        settingsSaveKey($db, 'security_barcode_created_by', (string)(int)($_SESSION['user_id'] ?? 0));
+        PosSecurity::resetCache();
+        AuditLog::log('security.barcode_created', 'New POS approval barcode generated.');
+        $_SESSION['settings_message'] = 'New approval barcode created. Print it and keep it with a manager.';
+        $_SESSION['settings_message_type'] = 'success';
+        header('Location: settings.php?tab=security');
+        exit();
+    }
+
+    if ($action === 'revoke_approval_barcode') {
+        foreach (['security_barcode_token', 'security_barcode_created_at', 'security_barcode_created_by'] as $k) {
+            settingsSaveKey($db, $k, '');
+        }
+        PosSecurity::resetCache();
+        AuditLog::log('security.barcode_revoked', 'POS approval barcode revoked.');
+        $_SESSION['settings_message'] = 'Approval barcode revoked.';
+        $_SESSION['settings_message_type'] = 'success';
+        header('Location: settings.php?tab=security');
+        exit();
+    }
+
+    if ($action === 'unenroll_fingerprint') {
+        foreach (['security_fp_cred_id', 'security_fp_pubkey', 'security_fp_enrolled_at', 'security_fp_enrolled_by'] as $k) {
+            settingsSaveKey($db, $k, '');
+        }
+        PosSecurity::resetCache();
+        AuditLog::log('security.fingerprint_removed', 'Approval fingerprint removed from this installation.');
+        $_SESSION['settings_message'] = 'Fingerprint removed from this installation.';
+        $_SESSION['settings_message_type'] = 'success';
+        header('Location: settings.php?tab=security');
+        exit();
+    }
+
+    if ($action === 'save_twofa') {
+        $enabled = isset($_POST['twofa_enabled']) ? 1 : 0;
+        $method  = ($_POST['twofa_method'] ?? 'email') === 'sms' ? 'sms' : 'email';
+        $phone   = trim((string)($_POST['twofa_phone'] ?? ''));
+
+        $email = '';
+        try {
+            $st = $db->prepare('SELECT email FROM users WHERE id = ? LIMIT 1');
+            $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+            $email = (string)($st->fetchColumn() ?: '');
+        } catch (Throwable $e) {
+        }
+
+        if ($enabled && $method === 'sms' && !preg_match('/^\+?[0-9][0-9\s\-]{6,20}$/', $phone)) {
+            $_SESSION['settings_message'] = 'Enter a valid phone number for SMS codes.';
+            $_SESSION['settings_message_type'] = 'danger';
+            header('Location: settings.php?tab=security');
+            exit();
+        }
+        if ($enabled && $method === 'email' && $email === '') {
+            $_SESSION['settings_message'] = 'Your account has no email address. Add one under My team first, or choose SMS.';
+            $_SESSION['settings_message_type'] = 'danger';
+            header('Location: settings.php?tab=security');
+            exit();
+        }
+
+        try {
+            $st = $db->prepare(
+                'INSERT INTO user_security (user_id, twofa_enabled, twofa_method, twofa_phone, updated_at)
+                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                 ON CONFLICT (user_id) DO UPDATE
+                 SET twofa_enabled = EXCLUDED.twofa_enabled,
+                     twofa_method  = EXCLUDED.twofa_method,
+                     twofa_phone   = EXCLUDED.twofa_phone,
+                     updated_at    = CURRENT_TIMESTAMP'
+            );
+            $st->execute([(int)($_SESSION['user_id'] ?? 0), $enabled, $method, $phone !== '' ? $phone : null]);
+            AuditLog::log($enabled ? 'security.twofa_enabled' : 'security.twofa_disabled',
+                'Two-factor authentication ' . ($enabled ? 'enabled' : 'disabled') . ' for this account (' . $method . ').', [
+                    'method' => $method,
+                ]);
+            $_SESSION['settings_message'] = $enabled
+                ? 'Two-factor authentication enabled for your account.'
+                : 'Two-factor authentication disabled.';
+            $_SESSION['settings_message_type'] = 'success';
+        } catch (Throwable $e) {
+            $_SESSION['settings_message'] = 'Two-factor settings could not be saved: ' . $e->getMessage();
+            $_SESSION['settings_message_type'] = 'danger';
+        }
+        header('Location: settings.php?tab=security');
         exit();
     }
 
@@ -800,6 +947,9 @@ setTimeout(() => {
 
     <hr>
     <div class="nav-section-label">Administration</div>
+    <a href="#" class="nav-link <?php echo $active_tab==='security'?'active':''; ?>" data-tab="security">
+        <i class="fas fa-shield"></i> Security
+    </a>
     <a href="#" class="nav-link <?php echo $active_tab==='roles'?'active':''; ?>" data-tab="roles">
         <i class="fas fa-users-cog"></i> Users
     </a>
@@ -808,6 +958,9 @@ setTimeout(() => {
     </a>
     <a href="#" class="nav-link <?php echo $active_tab==='licence'?'active':''; ?>" data-tab="licence">
         <i class="fas fa-key"></i> Licence
+    </a>
+    <a href="/pos/activity_logs.php" class="nav-link">
+        <i class="fas fa-clipboard-list"></i> Activity logs
     </a>
 
     <hr>
@@ -2052,6 +2205,319 @@ document.getElementById('licenceCopy').addEventListener('click', function () {
 </div>
 
 </div><!-- /panel-backup -->
+
+<!-- ════ SECURITY ════ -->
+<?php
+$secSaleLimit = (float)($s['security_sale_limit'] ?? 0);
+$secRemove    = ($s['security_remove_approval'] ?? '0') === '1';
+$secMode      = (string)($s['security_approval_mode'] ?? 'either');
+if (!in_array($secMode, ['either', 'fingerprint', 'barcode', 'otp'], true)) $secMode = 'either';
+$secOtpChannel = ($s['security_otp_channel'] ?? 'sms') === 'email' ? 'email' : 'sms';
+$secManagerPhone = (string)($s['security_manager_phone'] ?? '');
+$secManagerEmail = (string)($s['security_manager_email'] ?? '');
+$secBarcode   = (string)($s['security_barcode_token'] ?? '');
+$secBarcodeAt = (string)($s['security_barcode_created_at'] ?? '');
+$secFpCred    = (string)($s['security_fp_cred_id'] ?? '');
+$secFpAt      = (string)($s['security_fp_enrolled_at'] ?? '');
+$mySec = ['twofa_enabled' => 0, 'twofa_method' => 'email', 'twofa_phone' => ''];
+$myEmail = '';
+try {
+    $st = $db->prepare('SELECT twofa_enabled, twofa_method, twofa_phone FROM user_security WHERE user_id = ? LIMIT 1');
+    $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if ($row) $mySec = array_merge($mySec, $row);
+    $st = $db->prepare('SELECT email FROM users WHERE id = ? LIMIT 1');
+    $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+    $myEmail = (string)($st->fetchColumn() ?: '');
+} catch (Throwable $e) {
+}
+?>
+<div class="settings-panel <?php echo $active_tab==='security'?'active':''; ?>" id="panel-security">
+<style>
+#approvalBarcode { max-width: 100%; overflow: hidden; }
+#approvalBarcode svg { max-width: 100%; height: auto; display: block; }
+</style>
+
+<div class="settings-section">
+    <div class="section-title"><i class="fas fa-shield"></i> Point of sale controls</div>
+    <form method="POST">
+        <input type="hidden" name="action" value="save_security_policy">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Maximum sale per transaction (<?php echo htmlspecialchars(getCurrencySymbol()); ?>)</label>
+                <input type="number" class="form-control" name="security_sale_limit" min="0" step="0.01"
+                       value="<?php echo htmlspecialchars(number_format($secSaleLimit, 2, '.', '')); ?>">
+                <div style="font-size:.72rem;color:var(--text-subtle);margin-top:4px;">Cashiers and staff must get approval above this amount. Use 0 to disable the limit.</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Approval method</label>
+                <select class="form-select" name="security_approval_mode">
+                    <option value="either" <?php echo $secMode==='either'?'selected':''; ?>>Fingerprint, manager barcode or one-time code</option>
+                    <option value="fingerprint" <?php echo $secMode==='fingerprint'?'selected':''; ?>>Fingerprint only</option>
+                    <option value="barcode" <?php echo $secMode==='barcode'?'selected':''; ?>>Manager barcode only</option>
+                    <option value="otp" <?php echo $secMode==='otp'?'selected':''; ?>>One-time code only (SMS or email)</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex flex-column justify-content-end">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" name="security_remove_approval" id="secRemoveApproval" <?php echo $secRemove?'checked':''; ?>>
+                    <label class="form-check-label" for="secRemoveApproval">Require approval to remove a cart item</label>
+                </div>
+                <div style="font-size:.72rem;color:var(--text-subtle);">Once a cashier adds a product it stays in the cart until a manager scans the barcode or approves with a fingerprint.</div>
+            </div>
+        </div>
+        <div class="row g-3 mt-1">
+            <div class="col-md-4">
+                <label class="form-label">Send approval codes by</label>
+                <select class="form-select" name="security_otp_channel">
+                    <option value="sms" <?php echo $secOtpChannel==='sms'?'selected':''; ?>>SMS</option>
+                    <option value="email" <?php echo $secOtpChannel==='email'?'selected':''; ?>>Email</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Manager phone (approval SMS)</label>
+                <input type="text" class="form-control" name="security_manager_phone" value="<?php echo htmlspecialchars($secManagerPhone); ?>" placeholder="2547XXXXXXXX">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Manager email (approval code)</label>
+                <input type="email" class="form-control" name="security_manager_email" value="<?php echo htmlspecialchars($secManagerEmail); ?>" placeholder="manager@example.com">
+            </div>
+        </div>
+        <div style="font-size:.72rem;color:var(--text-subtle);margin-top:6px;">
+            The manager receives a 6-digit code by SMS or email and reads it to the cashier. SMS uses the provider under SMS; email uses the SMTP settings under Email.
+        </div>
+        <div class="text-end mt-3">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save security controls</button>
+        </div>
+    </form>
+</div>
+
+<div class="settings-section">
+    <div class="section-title"><i class="fas fa-lock"></i> Manager fingerprint</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <?php if ($secFpCred): ?>
+            <span class="badge bg-success">Enrolled</span>
+            <span style="font-size:.8rem;color:var(--text-secondary);">Enrolled <?php echo htmlspecialchars($secFpAt ?: 'on this device'); ?>.</span>
+            <form method="POST" style="margin-left:auto;" onsubmit="return confirm('Remove the approval fingerprint from this installation?');">
+                <input type="hidden" name="action" value="unenroll_fingerprint">
+                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash me-1"></i>Remove</button>
+            </form>
+        <?php else: ?>
+            <span class="badge bg-secondary">Not enrolled</span>
+            <button type="button" class="btn btn-dark btn-sm" id="fpEnrollBtn" onclick="enrollFingerprint()">
+                <i class="fas fa-check-circle me-1"></i>Enroll fingerprint
+            </button>
+        <?php endif; ?>
+    </div>
+    <div id="fpStatus" style="font-size:.78rem;color:var(--text-secondary);margin-top:8px;"></div>
+    <div style="font-size:.72rem;color:var(--text-subtle);margin-top:6px;">
+        Uses the device fingerprint reader through Windows Hello. Works when the POS is opened on <code>http://localhost</code> or over HTTPS; on a plain LAN address use the manager barcode instead.
+    </div>
+</div>
+
+<div class="settings-section">
+    <div class="section-title"><i class="fas fa-barcode"></i> Approval barcode</div>
+    <?php if ($secBarcode): ?>
+        <div id="approvalBarcode" style="background:#fff;padding:12px;border:1px solid var(--border);border-radius:8px;display:inline-block;"></div>
+        <div style="font-family:monospace;font-size:.78rem;margin-top:6px;letter-spacing:.5px;"><?php echo htmlspecialchars($secBarcode); ?></div>
+        <div style="font-size:.72rem;color:var(--text-subtle);margin-top:4px;">Created <?php echo htmlspecialchars($secBarcodeAt ?: 'recently'); ?>. Print it and keep it with a manager.</div>
+        <div class="d-flex gap-2 mt-3">
+            <button type="button" class="btn btn-dark btn-sm" onclick="printApprovalBarcode()"><i class="fas fa-print me-1"></i>Print barcode</button>
+            <form method="POST" onsubmit="return confirm('Generate a new barcode? The old one will stop working.');">
+                <input type="hidden" name="action" value="generate_approval_barcode">
+                <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="fas fa-rotate me-1"></i>Regenerate</button>
+            </form>
+            <form method="POST" onsubmit="return confirm('Revoke the approval barcode?');">
+                <input type="hidden" name="action" value="revoke_approval_barcode">
+                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash me-1"></i>Revoke</button>
+            </form>
+        </div>
+    <?php else: ?>
+        <p style="font-size:.8rem;color:var(--text-secondary);margin:0 0 10px 0;">Create a barcode that managers can scan at the POS to approve a high-value sale or a cart removal.</p>
+        <form method="POST">
+            <input type="hidden" name="action" value="generate_approval_barcode">
+            <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-barcode me-1"></i>Create approval barcode</button>
+        </form>
+    <?php endif; ?>
+</div>
+
+<div class="settings-section">
+    <div class="section-title"><i class="fas fa-key"></i> Two-factor authentication (this account)</div>
+    <form method="POST">
+        <input type="hidden" name="action" value="save_twofa">
+        <div class="row g-3">
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="twofa_enabled" id="twofaEnabled" <?php echo (int)$mySec['twofa_enabled']===1?'checked':''; ?>>
+                    <label class="form-check-label" for="twofaEnabled">Ask for a one-time code at sign-in</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Send the code by</label>
+                <select class="form-select" name="twofa_method" id="twofaMethod">
+                    <option value="email" <?php echo $mySec['twofa_method']==='email'?'selected':''; ?>>Email</option>
+                    <option value="sms" <?php echo $mySec['twofa_method']==='sms'?'selected':''; ?>>SMS</option>
+                </select>
+                <div style="font-size:.72rem;color:var(--text-subtle);margin-top:4px;">Email: <?php echo htmlspecialchars($myEmail ?: 'not set'); ?></div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">SMS phone number</label>
+                <input type="text" class="form-control" name="twofa_phone" value="<?php echo htmlspecialchars((string)$mySec['twofa_phone']); ?>" placeholder="2547XXXXXXXX">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save me-1"></i>Save</button>
+            </div>
+        </div>
+        <div style="font-size:.72rem;color:var(--text-subtle);margin-top:8px;">
+            Email codes use the SMTP settings under Email. SMS codes use the provider configured under SMS. Both must be configured and working before you turn this on.
+        </div>
+    </form>
+</div>
+
+</div><!-- /panel-security -->
+<script>
+(function () {
+    var APPROVAL_TOKEN = <?php echo json_encode($secBarcode); ?>;
+    var STORE_LABEL    = <?php echo json_encode(SITE_NAME); ?>;
+
+    var C39 = {
+        '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw',
+        '5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn',
+        'A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn',
+        'F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn',
+        'K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn',
+        'P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn',
+        'U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn',
+        'Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','$':'nwnwnwnnn',
+        '/':'nwnwnnnwn','+':'nwnnnwnwn','%':'nnnwnwnwn','*':'nwnnwnwnn'
+    };
+
+    function barcodeSvg(text) {
+        text = String(text || '').toUpperCase();
+        var seq = ['*'].concat(text.split('')).concat(['*']);
+        var narrow = 2, wide = 5, height = 78, x = 12, rects = '';
+        seq.forEach(function (ch, idx) {
+            var p = C39[ch];
+            if (!p) return;
+            for (var i = 0; i < 9; i++) {
+                var w = p.charAt(i) === 'w' ? wide : narrow;
+                if (i % 2 === 0) {
+                    rects += '<rect x="' + x + '" y="14" width="' + w + '" height="' + height + '" fill="#000"/>';
+                }
+                x += w;
+            }
+            if (idx < seq.length - 1) x += narrow;
+        });
+        var total = x + 12;
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="' + total + '" height="' + (height + 44) +
+            '" viewBox="0 0 ' + total + ' ' + (height + 44) + '"><rect width="100%" height="100%" fill="#fff"/>' +
+            rects + '<text x="' + (total / 2) + '" y="' + (height + 34) +
+            '" text-anchor="middle" font-family="monospace" font-size="13" fill="#000">' + text + '</text></svg>';
+    }
+
+    if (APPROVAL_TOKEN) {
+        var holder = document.getElementById('approvalBarcode');
+        if (holder) holder.innerHTML = barcodeSvg(APPROVAL_TOKEN);
+    }
+
+    window.printApprovalBarcode = function () {
+        if (!APPROVAL_TOKEN) return;
+        var w = window.open('', '_blank', 'width=560,height=340');
+        if (!w) { alert('Allow popups to print the barcode.'); return; }
+        var html = '<!DOCTYPE html><html><head><title>Approval barcode</title><style>'
+            + 'body{font-family:"Segoe UI",Arial,sans-serif;text-align:center;padding:24px;color:#111;}'
+            + 'h1{font-size:16px;margin:0 0 4px;}p{font-size:11px;color:#444;margin:2px 0 18px;}'
+            + '.tok{font-family:monospace;font-size:12px;letter-spacing:.5px;margin-top:8px;}'
+            + '@media print{body{padding:8px;}}</style></head><body>'
+            + '<h1>' + STORE_LABEL.replace(/</g, '&lt;') + ' — manager approval</h1>'
+            + '<p>Scan at the POS when a sale or cart removal needs approval.</p>'
+            + barcodeSvg(APPROVAL_TOKEN)
+            + '<div class="tok">' + APPROVAL_TOKEN + '</div>'
+            + '<script>window.onload=function(){window.print();}<\/script></body></html>';
+        w.document.write(html);
+        w.document.close();
+    };
+
+    function b64uToBuf(v) {
+        var s = atob(String(v).replace(/-/g, '+').replace(/_/g, '/'));
+        var bytes = new Uint8Array(s.length);
+        for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+        return bytes.buffer;
+    }
+    function bufToB64u(buf) {
+        var bytes = new Uint8Array(buf), s = '';
+        for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+        return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    window.enrollFingerprint = function () {
+        var status = document.getElementById('fpStatus');
+        var btn = document.getElementById('fpEnrollBtn');
+        function say(msg, ok) {
+            if (status) {
+                status.textContent = msg;
+                status.style.color = ok ? 'var(--success,#16a34a)' : 'var(--danger,#dc2626)';
+            }
+        }
+        if (!window.PublicKeyCredential || !navigator.credentials) {
+            say('This browser does not support fingerprint sign-in. Use the manager barcode instead.', false);
+            return;
+        }
+        if (!window.isSecureContext) {
+            say('Fingerprint needs http://localhost or HTTPS. Use the manager barcode on this address.', false);
+            return;
+        }
+
+        if (btn) btn.disabled = true;
+        say('Waiting for the fingerprint reader...', true);
+
+        fetch('/pos/security_webauthn.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'register_begin' })
+        }).then(function (r) { return r.json(); }).then(function (begin) {
+            if (!begin.success) throw new Error(begin.message || 'Enrollment could not start.');
+            var pk = {
+                challenge: b64uToBuf(begin.challenge),
+                rp: begin.rp,
+                user: {
+                    id: b64uToBuf(begin.user.id),
+                    name: begin.user.name,
+                    displayName: begin.user.displayName
+                },
+                pubKeyCredParams: begin.pubKeyCredParams,
+                authenticatorSelection: begin.authenticatorSelection,
+                excludeCredentials: (begin.excludeCredentials || []).map(function (c) {
+                    return { type: c.type, id: b64uToBuf(c.id) };
+                }),
+                timeout: begin.timeout || 60000,
+                attestation: 'none'
+            };
+            return navigator.credentials.create({ publicKey: pk });
+        }).then(function (cred) {
+            if (!cred) throw new Error('No credential was created.');
+            return fetch('/pos/security_webauthn.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'register_finish',
+                    client_data: bufToB64u(cred.response.clientDataJSON),
+                    attestation_object: bufToB64u(cred.response.attestationObject)
+                })
+            });
+        }).then(function (r) { return r.json(); }).then(function (done) {
+            if (!done.success) throw new Error(done.message || 'Enrollment failed.');
+            say(done.message, true);
+            window.setTimeout(function () { location.reload(); }, 900);
+        }).catch(function (e) {
+            var msg = e && e.message ? e.message : 'Enrollment failed.';
+            if (e && e.name === 'NotAllowedError') msg = 'Fingerprint was cancelled.';
+            say(msg, false);
+            if (btn) btn.disabled = false;
+        });
+    };
+})();
+</script>
 
 </div><!-- /settings-content -->
 </div><!-- /settings-wrapper -->

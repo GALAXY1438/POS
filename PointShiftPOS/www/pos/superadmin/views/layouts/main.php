@@ -123,5 +123,6 @@ $_self        = basename($_SERVER['PHP_SELF']);
     });
 })();
 </script>
+<?php include __DIR__ . '/../../../views/partials/support_chat.php'; ?>
 </body>
 </html>

@@ -230,6 +230,9 @@ class User {
     }
     
     public static function logout() {
+        if (!empty($_SESSION['user_id'])) {
+            AuditLog::log('auth.logout', "Signed out '" . ($_SESSION['username'] ?? '') . "'.");
+        }
         session_destroy();
         header('Location: login.php');
         exit();

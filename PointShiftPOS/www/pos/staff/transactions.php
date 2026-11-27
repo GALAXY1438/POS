@@ -184,9 +184,14 @@ tr.selected-row { background:var(--bg-surface-2) !important; }
         <h5 style="font-size:1rem;font-weight:700;margin:0 0 2px;color:var(--text-primary);">Transactions</h5>
         <p style="font-size:.78rem;color:var(--text-secondary);margin:0;">Your sales history</p>
     </div>
-    <button onclick="window.print()" style="height:34px;padding:0 14px;border:1.5px solid var(--border-color);border-radius:var(--radius);background:transparent;cursor:pointer;font-size:.82rem;font-weight:600;font-family:inherit;color:var(--text-secondary);display:inline-flex;align-items:center;gap:6px;">
-        <i class="fas fa-print"></i> Print Report
-    </button>
+    <div style="display:flex;gap:8px;">
+        <button type="button" data-bs-toggle="modal" data-bs-target="#exportModal" style="height:34px;padding:0 14px;border:1.5px solid var(--border-color);border-radius:var(--radius);background:transparent;cursor:pointer;font-size:.82rem;font-weight:600;font-family:inherit;color:var(--text-secondary);display:inline-flex;align-items:center;gap:6px;">
+            <i class="fas fa-file-export"></i> Export
+        </button>
+        <button onclick="window.print()" style="height:34px;padding:0 14px;border:1.5px solid var(--border-color);border-radius:var(--radius);background:transparent;cursor:pointer;font-size:.82rem;font-weight:600;font-family:inherit;color:var(--text-secondary);display:inline-flex;align-items:center;gap:6px;">
+            <i class="fas fa-print"></i> Print Report
+        </button>
+    </div>
 </div>
 
 <!-- KPI tiles -->
@@ -420,13 +425,28 @@ tr.selected-row { background:var(--bg-surface-2) !important; }
 function printReceiptPanel() {
     const content = document.getElementById('receiptContent').innerHTML;
     const w = window.open('','_blank');
-    w.document.write('<html><head><title>Receipt</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:6px 8px;border:1px solid #ddd;}.text-right{text-align:right;}.text-center{text-align:center;}</style></head><body>'+content+'</body></html>');
+    w.document.write('<html><head><title>Receipt</title><style>body{font-family:"Segoe UI",Arial,sans-serif;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:6px 8px;border:1px solid #ddd;}.text-right{text-align:right;}.text-center{text-align:center;}</style></head><body>'+content+'</body></html>');
     w.document.close(); w.print();
 }
 </script>
 <?php endif; ?>
 
 <?php
+$expDataset         = 'transactions';
+$expLabel           = 'transactions';
+$expRowCount        = $totalCount;
+$expFilters         = [
+    'store_id'   => $staffStoreId,
+    'search'     => $search,
+    'date_from'  => $date_from,
+    'date_to'    => $date_to,
+    'pay_method' => $pay_method,
+];
+$expCanImport       = false;
+$expImportStoreId   = $staffStoreId;
+$expImportStoreName = 'My store';
+include __DIR__ . '/../admin/views/partials/data-import-export.php';
+
 $content = ob_get_clean();
 include 'views/layout.php';
 ?>

@@ -29,9 +29,11 @@ class User
     {
         try {
             $stmt = $this->db->prepare(
-                "SELECT * FROM users WHERE username = ? AND status = 'active' LIMIT 1"
+                "SELECT * FROM users
+                 WHERE (username = ? OR LOWER(email) = LOWER(?)) AND status = 'active'
+                 LIMIT 1"
             );
-            $stmt->execute([$username]);
+            $stmt->execute([$username, $username]);
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password'])) {
@@ -40,6 +42,25 @@ class User
                 return true;
             }
             return false;
+        } catch (PDOException) {
+            return false;
+        }
+    }
+
+    /**
+     * Sign in an existing active account without a password
+     * (used by fingerprint / badge login after the credential was verified).
+     */
+    public function loginById(int $id): bool
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM users WHERE id = ? AND status = 'active' LIMIT 1");
+            $stmt->execute([$id]);
+            $user = $stmt->fetch();
+            if (!$user) return false;
+            $this->hydrate($user);
+            $this->writeSession();
+            return true;
         } catch (PDOException) {
             return false;
         }
@@ -159,6 +180,9 @@ class User
 
     public static function logout(): never
     {
+        if (!empty($_SESSION['user_id'])) {
+            AuditLog::log('auth.logout', "Signed out '" . ($_SESSION['username'] ?? '') . "'.");
+        }
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $p = session_get_cookie_params();

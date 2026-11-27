@@ -144,6 +144,12 @@ class InventoryController {
                     VALUES (?,?,?,?,0,?,CURDATE(),?,?,NOW())");
                 $ir->execute([$pid,'Added',$qty,$qty,$qty,'Initial stock added',$user_id]);
             }
+            AuditLog::log('inventory.product_added', 'Product "' . trim($data['name']) . '" added with stock ' . $qty . '.', [
+                'product_id' => (int)$pid,
+                'sku'        => trim($data['sku'] ?? ''),
+                'price'      => floatval($data['price']),
+                'stock'      => $qty,
+            ]);
             return true;
         } catch(PDOException $e) {
             error_log("Add product error: " . $e->getMessage());
@@ -202,6 +208,13 @@ class InventoryController {
                     VALUES (?,?,?,?,?,?,CURDATE(),?,?,NOW())");
                 $ir->execute([$id,$type,$qty,$qty,$old_stock,$new_stock,$note,$user_id]);
             }
+            AuditLog::log('inventory.product_updated', 'Product #' . $id . ' "' . trim($data['name']) . '" updated'
+                . ($stock_change != 0 ? ' (stock ' . $old_stock . ' → ' . $new_stock . ')' : '') . '.', [
+                'product_id'   => (int)$id,
+                'stock_before' => $old_stock,
+                'stock_after'  => $new_stock,
+                'price'        => floatval($data['price']),
+            ]);
             return true;
         } catch(PDOException $e) {
             error_log("Update product error: " . $e->getMessage());
@@ -213,6 +226,7 @@ class InventoryController {
         try {
             $stmt = $this->db->prepare("UPDATE products SET status = 'inactive' WHERE id = ?");
             $stmt->execute([$id]);
+            AuditLog::log('inventory.product_deleted', 'Product #' . $id . ' deactivated.', ['product_id' => (int)$id]);
             return true;
         } catch(PDOException $e) {
             return false;

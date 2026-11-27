@@ -159,7 +159,7 @@ if (!empty($userId)) $_SESSION['verify_user_id'] = $userId;
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
             background: #f4f4f4;
             min-height: 100vh;
             display: flex; align-items: center; justify-content: center;

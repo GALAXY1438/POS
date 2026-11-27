@@ -174,7 +174,15 @@ class InventoryController
             if ($qty > 0 && $userId) {
                 $this->logStock($pid, 'Added', 0, $qty, $userId, 'Initial stock added');
             }
-            
+
+            AuditLog::log('inventory.product_added', 'Product "' . trim($data['name']) . '" added with stock ' . $qty . '.', [
+                'product_id' => $pid,
+                'sku'        => trim($data['sku'] ?? ''),
+                'price'      => (float)($data['price'] ?? 0),
+                'stock'      => $qty,
+                'store_id'   => $storeId,
+            ]);
+
             $this->syncNotifications($storeId);
             error_log("=== ADD PRODUCT SUCCESS ===");
             return true;
@@ -259,6 +267,15 @@ class InventoryController
                 $note = "{$type} by {$role}. Previous: {$oldStock} → New: {$newStock}";
                 $this->logStock($id, $type, $oldStock, $newStock, $userId, $note);
             }
+
+            AuditLog::log('inventory.product_updated', 'Product #' . $id . ' "' . trim($data['name']) . '" updated'
+                . ($stockDelta !== 0 ? ' (stock ' . $oldStock . ' → ' . $newStock . ')' : '') . '.', [
+                'product_id'   => $id,
+                'stock_before' => $oldStock,
+                'stock_after'  => $newStock,
+                'price'        => (float)($data['price'] ?? 0),
+            ]);
+
             $this->syncNotifications();
             return true;
         } catch (PDOException $e) {
@@ -272,6 +289,7 @@ class InventoryController
         try {
             $stmt = $this->db->prepare("UPDATE products SET status='inactive' WHERE id=?");
             $stmt->execute([$id]);
+            AuditLog::log('inventory.product_deleted', 'Product #' . $id . ' deactivated.', ['product_id' => $id]);
             $this->syncNotifications();
             return true;
         } catch (PDOException) {

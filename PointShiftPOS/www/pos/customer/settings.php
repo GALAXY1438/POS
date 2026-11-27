@@ -60,7 +60,7 @@ ob_start();
     max-width: 100%;
     margin: 0;
     padding: 20px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-family: var(--font);
 }
 
 .page-header {

@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ln = trim($_POST['last_name']  ?? '');
         $r  = $_POST['role']            ?? 'staff';
         $st = $_POST['status']          ?? 'active';
+        $bc = trim($_POST['badge_code'] ?? '');
 
         if (!$u || !$e || !$pw || !$fn || !$ln) {
             $flash = 'Fill in all required fields.'; $flash_type = 'err';
@@ -35,8 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $dup = $db->prepare("SELECT id FROM users WHERE username=? OR email=?");
             $dup->execute([$u, $e]);
+            $badgeTaken = false;
+            if ($bc !== '') {
+                $bt = $db->prepare("SELECT id FROM users WHERE badge_code=? LIMIT 1");
+                $bt->execute([$bc]);
+                $badgeTaken = (bool)$bt->fetch();
+            }
             if ($dup->fetch()) {
                 $flash = 'Username or email already exists.'; $flash_type = 'err';
+            } elseif ($badgeTaken) {
+                $flash = 'That badge code is already assigned to another user.'; $flash_type = 'err';
             } else {
                 // Check if multi-tenant mode
                 $storeCheck = $db->query("SHOW TABLES LIKE 'stores'");
@@ -45,14 +54,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($isMultiTenant && isset($_SESSION['store_id'])) {
                     // Multi-tenant: Add staff/cashier to current admin's store
                     $storeId = $_SESSION['store_id'];
-                    $ins = $db->prepare("INSERT INTO users (username,email,password,role,first_name,last_name,status,store_id) VALUES(?,?,?,?,?,?,?,?)");
-                    $ins->execute([$u, $e, password_hash($pw, PASSWORD_DEFAULT), $r, $fn, $ln, $st, $storeId]);
+                    $ins = $db->prepare("INSERT INTO users (username,email,password,role,first_name,last_name,status,store_id,badge_code) VALUES(?,?,?,?,?,?,?,?,?)");
+                    $ins->execute([$u, $e, password_hash($pw, PASSWORD_DEFAULT), $r, $fn, $ln, $st, $storeId, $bc !== '' ? $bc : null]);
                 } else {
                     // Single-tenant: Original behavior
-                    $ins = $db->prepare("INSERT INTO users (username,email,password,role,first_name,last_name,status) VALUES(?,?,?,?,?,?,?)");
-                    $ins->execute([$u, $e, password_hash($pw, PASSWORD_DEFAULT), $r, $fn, $ln, $st]);
+                    $ins = $db->prepare("INSERT INTO users (username,email,password,role,first_name,last_name,status,badge_code) VALUES(?,?,?,?,?,?,?,?)");
+                    $ins->execute([$u, $e, password_hash($pw, PASSWORD_DEFAULT), $r, $fn, $ln, $st, $bc !== '' ? $bc : null]);
                 }
                 $flash = 'User created.'; $flash_type = 'ok';
+                AuditLog::log('user.created', "Account '{$u}' created with role {$r}.", [
+                    'target_user_id' => (int)$db->lastInsertId(),
+                    'username'       => $u,
+                    'role'           => $r,
+                ]);
             }
         }
     }
@@ -64,14 +78,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ln  = trim($_POST['last_name']  ?? '');
         $r   = $_POST['role']            ?? 'staff';
         $st  = $_POST['status']          ?? 'active';
+        $bc  = trim($_POST['badge_code'] ?? '');
+
+        $badgeTaken = false;
+        if ($bc !== '') {
+            $bt = $db->prepare("SELECT id FROM users WHERE badge_code=? AND id<>? LIMIT 1");
+            $bt->execute([$bc, $uid]);
+            $badgeTaken = (bool)$bt->fetch();
+        }
 
         if ($uid === $me && $r !== User::currentRole()) {
             $flash = 'You cannot change your own role.'; $flash_type = 'err';
         } elseif ($uid === $me && $st === 'inactive') {
             $flash = 'You cannot deactivate your own account.'; $flash_type = 'err';
+        } elseif ($badgeTaken) {
+            $flash = 'That badge code is already assigned to another user.'; $flash_type = 'err';
         } else {
-            $db->prepare("UPDATE users SET email=?,role=?,first_name=?,last_name=?,status=? WHERE id=?")->execute([$e,$r,$fn,$ln,$st,$uid]);
+            $db->prepare("UPDATE users SET email=?,role=?,first_name=?,last_name=?,status=?,badge_code=? WHERE id=?")
+               ->execute([$e,$r,$fn,$ln,$st,$bc !== '' ? $bc : null,$uid]);
             $flash = 'User saved.'; $flash_type = 'ok';
+            AuditLog::log('user.updated', "Account #{$uid} updated (role {$r}, status {$st}).", [
+                'target_user_id' => $uid,
+                'role'           => $r,
+                'status'         => $st,
+            ]);
         }
     }
 
@@ -83,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $db->prepare("UPDATE users SET password=? WHERE id=?")->execute([password_hash($pw, PASSWORD_DEFAULT), $uid]);
             $flash = 'Password reset.'; $flash_type = 'ok';
+            AuditLog::log('user.password_reset', "Password reset for account #{$uid}.", ['target_user_id' => $uid]);
         }
     }
 
@@ -97,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newSt = $curSt === 'active' ? 'inactive' : 'active';
             $db->prepare("UPDATE users SET status=? WHERE id=?")->execute([$newSt, $uid]);
             $flash = 'User status updated to ' . $newSt . '.'; $flash_type = 'ok';
+            AuditLog::log('user.status_changed', "Account #{$uid} set to {$newSt}.", ['target_user_id' => $uid, 'status' => $newSt]);
         }
     }
 
@@ -112,6 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $db->prepare("DELETE FROM users WHERE id=?")->execute([$uid]);
                 $flash = 'User deleted.'; $flash_type = 'ok';
+                AuditLog::log('user.deleted', "Account #{$uid} deleted.", ['target_user_id' => $uid]);
             }
         }
     }
@@ -302,7 +335,7 @@ ob_start();
                     </div>
                 </div>
             </td>
-            <td style="font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:.78rem;color:var(--text-secondary);"><?php echo htmlspecialchars($u['username']); ?></td>
+            <td style="font-family:var(--font);font-size:.78rem;color:var(--text-secondary);"><?php echo htmlspecialchars($u['username']); ?></td>
             <td style="font-size:.82rem;color:var(--text-secondary);"><?php echo htmlspecialchars($u['email']); ?></td>
             <td><span class="role-pill <?php echo htmlspecialchars($u['role']); ?>"><?php echo str_replace('_',' ',ucfirst($u['role'])); ?></span></td>
             <td><span class="st-pill <?php echo $u['status']; ?>"><?php echo ucfirst($u['status']); ?></span></td>
@@ -356,6 +389,7 @@ ob_start();
         <div style="margin-bottom:14px;"><label class="ml">Username *</label><input type="text" name="username" class="mi" required placeholder="johndoe" autocomplete="off"></div>
         <div style="margin-bottom:14px;"><label class="ml">Email *</label><input type="email" name="email" class="mi" required placeholder="john@example.com"></div>
         <div style="margin-bottom:14px;"><label class="ml">Password * <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);">(min 6 chars)</span></label><input type="password" name="password" class="mi" required minlength="6" autocomplete="new-password"></div>
+        <div style="margin-bottom:14px;"><label class="ml">Badge code <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);">(optional — for barcode sign-in)</span></label><input type="text" name="badge_code" class="mi" placeholder="e.g. EMP001" autocomplete="off"></div>
         <div class="row g-2">
             <div class="col-6"><label class="ml">Role *</label>
                 <select name="role" class="mi">
@@ -387,13 +421,14 @@ ob_start();
     <div class="modal-body" style="padding:20px 22px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;background:var(--bg-body);border:1px solid var(--border-color);border-radius:var(--radius);">
             <div class="u-avatar" id="eu_avatar" style="width:38px;height:38px;font-size:.85rem;">—</div>
-            <div><div style="font-weight:600;font-size:.85rem;" id="eu_name_display">—</div><div style="font-size:.72rem;color:var(--text-muted);font-family:'SF Mono','Consolas',monospace;" id="eu_username_display">—</div></div>
+            <div><div style="font-weight:600;font-size:.85rem;" id="eu_name_display">—</div><div style="font-size:.72rem;color:var(--text-muted);font-family:var(--font);" id="eu_username_display">—</div></div>
         </div>
         <div class="row g-2 mb-3">
             <div class="col-6"><label class="ml">First name *</label><input type="text" name="first_name" id="eu_fn" class="mi" required></div>
             <div class="col-6"><label class="ml">Last name *</label><input type="text" name="last_name" id="eu_ln" class="mi" required></div>
         </div>
         <div style="margin-bottom:14px;"><label class="ml">Email *</label><input type="email" name="email" id="eu_email" class="mi" required></div>
+        <div style="margin-bottom:14px;"><label class="ml">Badge code <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);">(for barcode sign-in)</span></label><input type="text" name="badge_code" id="eu_badge" class="mi" placeholder="e.g. EMP001" autocomplete="off"></div>
         <div class="row g-2">
             <div class="col-6"><label class="ml">Role *</label>
                 <select name="role" id="eu_role" class="mi">
@@ -440,6 +475,7 @@ function openEditUser(u) {
     document.getElementById('eu_fn').value = u.first_name;
     document.getElementById('eu_ln').value = u.last_name;
     document.getElementById('eu_email').value = u.email;
+    document.getElementById('eu_badge').value = u.badge_code || '';
     document.getElementById('eu_avatar').textContent = (u.first_name.charAt(0)+u.last_name.charAt(0)).toUpperCase();
     document.getElementById('eu_name_display').textContent = u.first_name+' '+u.last_name;
     document.getElementById('eu_username_display').textContent = '@'+u.username;

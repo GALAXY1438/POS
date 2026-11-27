@@ -17,10 +17,30 @@ class AuthController
             return ['success' => false, 'message' => 'Please fill in all fields.'];
         }
 
-        if ($this->user->login($username, $password)) {
+        $result = $this->user->login($username, $password);
+
+        if (is_array($result) && isset($result['verified']) && !$result['verified']) {
+            AuditLog::log('auth.login_unverified', "Sign-in blocked for '{$username}': email not verified.", [], [
+                'user_id'  => $result['user_id'] ?? null,
+                'username' => $username,
+            ]);
+            return [
+                'success'            => false,
+                'needs_verification' => true,
+                'email'              => $result['email'] ?? '',
+                'user_id'            => $result['user_id'] ?? null,
+                'message'            => 'Please verify your email address before logging in.',
+            ];
+        }
+
+        if ($result === true) {
+            AuditLog::log('auth.login', "Signed in as '{$username}'.");
             return ['success' => true, 'message' => 'Login successful.'];
         }
 
+        AuditLog::log('auth.login_failed', "Wrong username or password for '{$username}'.", [], [
+            'username' => $username,
+        ]);
         return ['success' => false, 'message' => 'Invalid username or password.'];
     }
 

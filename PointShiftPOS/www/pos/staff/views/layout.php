@@ -78,6 +78,9 @@ try {
             <li><a class="nav-link <?php echo $_self==='pos.php'?'active':''; ?>" href="pos.php">
                 <i class="fas fa-cash-register"></i> Point of sale
             </a></li>
+            <li><a class="nav-link <?php echo $_self==='shift_register.php'?'active':''; ?>" href="/pos/shift_register.php">
+                <i class="fas fa-clock-rotate-left"></i> My shift
+            </a></li>
             <li><a class="nav-link <?php echo $_self==='transactions.php'?'active':''; ?>" href="transactions.php">
                 <i class="fas fa-file-lines"></i> Transactions
             </a></li>
@@ -155,5 +158,6 @@ try {
     });
 })();
 </script>
+<?php include __DIR__ . '/../../views/partials/support_chat.php'; ?>
 </body>
 </html>

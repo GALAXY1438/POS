@@ -125,6 +125,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tx_action'])) {
 if (($_GET['flash'] ?? '') === 'deleted') {
     $flash = 'Transaction deleted and stock restored.'; $flash_type = 'success';
 }
+if (isset($_GET['imported']) || isset($_GET['skipped'])) {
+    $imp = (int)($_GET['imported'] ?? 0);
+    $skp = (int)($_GET['skipped'] ?? 0);
+    $flash = "Import finished — {$imp} added, {$skp} skipped.";
+    $flash_type = $imp > 0 ? 'success' : 'warning';
+}
 
 // ── AJAX receipt handler — must be before ob_start() ─────────────────────────
 if (isset($_GET['ajax_receipt'])) {
@@ -439,6 +445,14 @@ ob_start();
         <p>Sales history and receipts</p>
     </div>
     <div class="page-header-actions">
+        <?php if ($isAdmin): ?>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="fas fa-file-import me-1"></i>Import
+        </button>
+        <?php endif; ?>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="fas fa-file-export me-1"></i>Export
+        </button>
         <button onclick="printReport()" class="btn btn-primary btn-sm">
             <i class="fas fa-print me-1"></i>Print report
         </button>
@@ -843,7 +857,7 @@ function printReport() {
     <?php if($pay_method)  echo "filterInfo.push('Payment: ".ucfirst($pay_method)."');"; ?>
 
     w.document.write('<!DOCTYPE html><html><head><title>Transactions Report</title><style>');
-    w.document.write('*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#111}');
+    w.document.write('*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Segoe UI",Arial,sans-serif;font-size:11px;padding:20px;color:#111}');
     w.document.write('h2,h3{margin-bottom:4px}p{margin-bottom:2px;color:#555;font-size:10px}');
     w.document.write('.header{text-align:center;padding-bottom:12px;border-bottom:2px solid #111;margin-bottom:12px}');
     w.document.write('.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;padding:10px;background:#f7f7f7;border-radius:4px}');
@@ -1180,5 +1194,22 @@ function confirmDeleteTx(id, orderNum) {
 </script>
 
 <?php
+$expDataset        = 'transactions';
+$expLabel          = 'transactions';
+$expRowCount       = $totalCount;
+$expFilters        = [
+    'store_id'   => $selectedStoreId,
+    'search'     => $search,
+    'date_from'  => $date_from,
+    'date_to'    => $date_to,
+    'status'     => $status,
+    'cashier'    => $cashier,
+    'pay_method' => $pay_method,
+];
+$expCanImport      = $isAdmin;
+$expImportStoreId  = $selectedStoreId > 0 ? $selectedStoreId : (int)($_SESSION['store_id'] ?? 1);
+$expImportStoreName = $selectedStoreId > 0 ? $selectedStoreName : 'My Store';
+include __DIR__ . '/views/partials/data-import-export.php';
+
 $content = ob_get_clean();
 include __DIR__ . '/views/layouts/main.php';

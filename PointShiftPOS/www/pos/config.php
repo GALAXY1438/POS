@@ -30,6 +30,11 @@ if (getenv('POS_BASE_URL')) {
 define('SITE_NAME', 'TechShift POS');
 require_once __DIR__ . '/version.php';
 
+// ── Support ───────────────────────────────────────────────────────────────────
+// Inbox for assistant / support tickets. Override with POS_SUPPORT_EMAIL when
+// the final support address is confirmed.
+define('SUPPORT_EMAIL', getenv('POS_SUPPORT_EMAIL') ?: 'dantech1438@gmail.com');
+
 // ── Roles ─────────────────────────────────────────────────────────────────────
 define('ROLE_SUPER_ADMIN', 'super_admin');
 define('ROLE_ADMIN',       'admin');
@@ -67,6 +72,17 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// ── Two-factor gate ──────────────────────────────────────────────────────────
+// A password-verified user with 2FA enabled stays on verify_2fa.php until the
+// one-time code is confirmed.
+if (PHP_SAPI !== 'cli' && !empty($_SESSION['tfa'])) {
+    $tfaPage = basename($_SERVER['PHP_SELF'] ?? '');
+    if (!in_array($tfaPage, ['verify_2fa.php', 'login.php', 'login_secure.php', 'logout.php', 'license.php', 'terms.php', 'accept_terms.php'], true)) {
+        header('Location: ' . SITE_URL . '/verify_2fa.php');
+        exit();
+    }
+}
+
 // ── Licence gate ──────────────────────────────────────────────────────────────
 // The app is unusable until a valid key for this machine is stored.
 // license.php and terms.php must stay reachable so the customer can activate.
@@ -98,7 +114,7 @@ $conn = new MysqliCompat(Database::getInstance()->getConnection());
 // Recorded per installation when the admin accepts the agreement at first login.
 if (PHP_SAPI !== 'cli' && !empty($_SESSION['user_id'])) {
     $selfPage = basename($_SERVER['PHP_SELF'] ?? '');
-    $eulaSkip = ['accept_terms.php', 'terms.php', 'logout.php', 'license.php'];
+    $eulaSkip = ['accept_terms.php', 'terms.php', 'logout.php', 'license.php', 'verify_2fa.php'];
     if (!in_array($selfPage, $eulaSkip, true)) {
         if (($_SESSION['eula_ok'] ?? '') !== Eula::VERSION) {
             if (Eula::isAccepted()) {

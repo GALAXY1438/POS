@@ -154,7 +154,7 @@ function buildReceiptHtml(c) {
             });
         }
         discountLines += '<div class="rct-disc-row rct-disc-total">'
-            + '<span>Total Discount'+(c.discountPercent>0?' ('+c.discountPercent+'%)':'')+'</span>'
+            + '<span>'+(c.discountLabel||'Total Discount')+(c.discountPercent>0?' ('+c.discountPercent+'%)':'')+'</span>'
             + '<span>-'+fmt(totalDiscount)+'</span>'
             + '</div>';
     }
@@ -231,7 +231,7 @@ function buildReceiptHtml(c) {
         + '<div class="rct-totals">'
         + '<div class="rct-tot-row"><span>Items</span><span>'+totalQty+'</span></div>'
         + '<div class="rct-tot-row"><span>Subtotal</span><span>'+fmt(subtotal)+'</span></div>'
-        + (totalDiscount>0 ? '<div class="rct-tot-row rct-discount-line"><span>Discount'+(c.discountPercent>0?' ('+c.discountPercent+'%)':'')+'</span><span>-'+fmt(totalDiscount)+'</span></div>' : '')
+        + (totalDiscount>0 ? '<div class="rct-tot-row rct-discount-line"><span>'+(c.discountLabel||'Discount')+(c.discountPercent>0?' ('+c.discountPercent+'%)':'')+'</span><span>-'+fmt(totalDiscount)+'</span></div>' : '')
         + (tax>0 ? '<div class="rct-tot-row rct-tax-line"><span>'+(c.taxName||'VAT')+' incl.</span><span>'+fmt(tax)+'</span></div>' : '')
         + '<div class="rct-dashed" style="margin:5px 0;"></div>'
         + '<div class="rct-tot-row rct-grand"><span>TOTAL</span><span>'+fmt(total)+'</span></div>'

@@ -233,7 +233,7 @@ ob_start();
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 16px 18px;
+    padding: 12px 14px;
     position: relative;
     overflow: hidden;
     transition: border-color .15s, box-shadow .15s;
@@ -251,14 +251,14 @@ ob_start();
     opacity: .06;
 }
 .kpi-label {
-    font-size: .68rem; font-weight: 500;
+    font-size: .6875rem; font-weight: 500;
     letter-spacing: .2px;
-    color: var(--text-secondary); margin-bottom: 6px;
+    color: var(--text-secondary); margin-bottom: 4px;
 }
 .kpi-value {
-    font-size: 1.35rem; font-weight: 700;
-    color: var(--text-primary); letter-spacing: -.5px;
-    line-height: 1.15;
+    font-size: 1.125rem; font-weight: 600;
+    color: var(--text-primary); letter-spacing: -.3px;
+    line-height: 1.2;
 }
 .kpi-sub {
     font-size: .7rem; color: var(--text-muted); margin-top: 3px;
@@ -291,7 +291,7 @@ ob_start();
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 16px;
+    padding: 12px 14px;
     text-align: left;
     transition: border-color .15s, box-shadow .15s, background .15s;
     cursor: pointer;
@@ -300,9 +300,9 @@ ob_start();
     display: block;
 }
 .tile:hover { border-color: var(--border-strong, #D4D4D4); box-shadow: var(--shadow-sm); background: var(--bg-surface-2); color: inherit !important; }
-.tile-lbl  { font-size: var(--fs-12, 12px); font-weight: 500; color: var(--text-subtle);
-             text-transform: uppercase; letter-spacing: .08em; margin: 0 0 6px; }
-.tile-val  { font-size: var(--fs-24, 24px); font-weight: 600; color: var(--text); line-height: 1.1;
+.tile-lbl  { font-size: 11px; font-weight: 500; color: var(--text-subtle);
+             text-transform: uppercase; letter-spacing: .08em; margin: 0 0 4px; }
+.tile-val  { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.2;
              font-variant-numeric: tabular-nums; }
 
 /* ── Section cards ── */
@@ -970,7 +970,7 @@ window.DASH = {
     }
 
     Chart.defaults.font.size = 11;
-    Chart.defaults.font.family = 'Inter,"Segoe UI",system-ui,-apple-system,sans-serif';
+    Chart.defaults.font.family = '"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif';
     Chart.defaults.color = palette().tick;
 
     function baseOptions(p) {

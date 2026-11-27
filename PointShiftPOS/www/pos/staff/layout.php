@@ -33,7 +33,7 @@
             <li><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='dashboard.php'?'active':''; ?>" href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a></li>
             <li><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='manage_product.php'?'active':''; ?>" href="manage_product.php"><i class="fas fa-box"></i> Manage product</a></li>
             <li><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='inventory_reports.php'?'active':''; ?>" href="inventory_reports.php"><i class="fas fa-file-alt"></i> Inventory reports</a></li>
-            <li><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='view_shifts.php'?'active':''; ?>" href="../view_shifts.php"><i class="fas fa-calendar-alt"></i> View shifts</a></li>
+            <li><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='shift_register.php'?'active':''; ?>" href="../shift_register.php"><i class="fas fa-clock-rotate-left"></i> Shifts</a></li>
             <li><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='account_settings.php'?'active':''; ?>" href="account_settings.php"><i class="fas fa-user-cog"></i> Account settings</a></li>
         </ul>
     </nav>

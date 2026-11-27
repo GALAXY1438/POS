@@ -3,14 +3,6 @@
    Strict monochrome. Status colours only for status meaning.
    ============================================================ */
 
-@font-face {
-    font-family: "Inter";
-    src: url("/pos/assets/fonts/InterVariable.woff2") format("woff2-variations");
-    font-weight: 100 900;
-    font-style: normal;
-    font-display: swap;
-}
-
 :root {
     /* Base palette */
     --bg:               #F5F5F5;
@@ -31,7 +23,7 @@
     --danger:  #B91C1C;
 
     /* Typography */
-    --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --fs-12: 12px;
     --fs-13: 13px;
     --fs-14: 14px;
@@ -109,7 +101,7 @@
     --bs-body-bg:           #F5F5F5;
     --bs-emphasis-color:    #0A0A0A;
     --bs-heading-color:     #0A0A0A;
-    --bs-body-font-family:  "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --bs-body-font-family:  "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --bs-nav-link-color:    #525252;
     --bs-nav-link-hover-color: #0A0A0A;
     --bs-navbar-color:      #525252;

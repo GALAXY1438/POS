@@ -82,8 +82,11 @@ try {
                     <?php endif; ?>
                 </a>
             </li>
-            <li><a class="nav-link <?php echo $_self==='view_shifts.php'?'active':''; ?>" href="view_shifts.php">
-                <i class="fas fa-calendar"></i> Shifts
+            <li><a class="nav-link <?php echo $_self==='shift_register.php'?'active':''; ?>" href="/pos/shift_register.php">
+                <i class="fas fa-clock-rotate-left"></i> Shifts
+            </a></li>
+            <li><a class="nav-link <?php echo $_self==='integrations.php'?'active':''; ?>" href="integrations.php">
+                <i class="fas fa-exchange-alt"></i> Integrations
             </a></li>
             <li><a class="nav-link <?php echo $_self==='settings.php'?'active':''; ?>" href="settings.php">
                 <i class="fas fa-sliders"></i> Settings

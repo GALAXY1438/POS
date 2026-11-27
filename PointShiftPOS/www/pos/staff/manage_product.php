@@ -571,7 +571,7 @@ ob_start();
         const barcodeValue = document.getElementById('barcodeValue').textContent;
         
         printWindow.document.write('<html><head><title>Print Barcode</title>');
-        printWindow.document.write('<style>body{text-align:center;padding:20px;font-family:Arial;}img{max-width:100%;}</style>');
+        printWindow.document.write('<style>body{text-align:center;padding:20px;font-family:"Segoe UI",Arial,sans-serif;}img{max-width:100%;}</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write('<h3>' + productName + '</h3>');
         printWindow.document.write('<img src="' + barcodeImg + '" />');

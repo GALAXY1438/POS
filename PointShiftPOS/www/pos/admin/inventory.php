@@ -98,7 +98,8 @@ $offset = ($page - 1) * $perPage;
 $products = array_slice($allProducts, $offset, $perPage);
 
 // Handle CRUD actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isAdmin) {
+$canPost = $isAdmin || ($isStaff && ($_POST['action'] ?? '') === 'add_stock');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $canPost) {
     switch ($_POST['action']) {
         case 'add_product':
             $ic->addProduct($_POST);
@@ -115,6 +116,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isAdmin
                 $db->prepare("UPDATE products SET status='inactive' WHERE id=?")->execute([$id]);
             }
             header('Location: inventory.php?tab=products&msg=product_deleted'); exit();
+        case 'add_stock':
+            $id      = (int)($_POST['product_id'] ?? 0);
+            $qty     = (int)($_POST['qty'] ?? 0);
+            $barcode = trim($_POST['barcode'] ?? '');
+            $scope   = $currentStoreId > 0 ? $currentStoreId : 0;
+
+            $stmt = $db->prepare("SELECT id, name, stock_quantity, store_id FROM products
+                                  WHERE id = ? AND status = 'active'" . ($scope > 0 ? ' AND store_id = ?' : '') . " LIMIT 1");
+            $stmt->execute($scope > 0 ? [$id, $scope] : [$id]);
+            $prod = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$prod || $qty <= 0) {
+                header('Location: inventory.php?tab=products&error=stock_invalid'); exit();
+            }
+            $before = (int)$prod['stock_quantity'];
+            $after  = $before + $qty;
+
+            $db->prepare("UPDATE products SET stock_quantity = ?, last_updated_by = ? WHERE id = ?")
+               ->execute([$after, (int)$_SESSION['user_id'], $id]);
+            try {
+                $db->prepare("INSERT INTO inventory_reports
+                    (date, product_id, user_id, store_id, change_type, quantity, quantity_changed, previous_quantity, new_quantity, remarks)
+                    VALUES (CURRENT_DATE, ?, ?, ?, 'Added', ?, ?, ?, ?, 'Barcode restock')")
+                   ->execute([$id, (int)$_SESSION['user_id'], (int)($prod['store_id'] ?? 1), $after, $qty, $before, $after]);
+            } catch (Throwable $e) {}
+            AuditLog::log('inventory.stock_added', "Stock for '{$prod['name']}' increased by {$qty} ({$before} → {$after}).", [
+                'product_id' => $id,
+                'qty'        => $qty,
+            ]);
+
+            header('Location: inventory.php?tab=products&msg=stock_added&search=' . urlencode($barcode !== '' ? $barcode : $prod['name']));
+            exit();
         case 'add_category':
             $name = trim($_POST['cat_name'] ?? '');
             $desc = trim($_POST['cat_description'] ?? '');
@@ -151,9 +184,13 @@ if (($_GET['action'] ?? '') === 'check_barcode') {
     $storeId = (int)($_GET['store_id'] ?? $filterStoreId);
     $result  = ['success' => false];
     if ($code !== '') {
-        $st = $db->prepare("SELECT id, name, barcode, stock_quantity FROM products
-                            WHERE barcode = ? AND store_id = ? AND status='active' LIMIT 1");
-        $st->execute([$code, $storeId]);
+        $sql = "SELECT id, name, barcode, sku, stock_quantity, low_stock_threshold, store_id
+                  FROM products
+                 WHERE barcode = ? AND status='active'"
+             . ($storeId > 0 ? ' AND store_id = ?' : '')
+             . " LIMIT 1";
+        $st = $db->prepare($sql);
+        $st->execute($storeId > 0 ? [$code, $storeId] : [$code]);
         if ($p = $st->fetch(PDO::FETCH_ASSOC)) {
             $result = ['success' => true, 'product' => $p];
         }
@@ -169,11 +206,27 @@ $flashMsgs = [
     'added' => 'Category saved.',
     'updated' => 'Category updated.',
     'deleted' => 'Category deleted.',
+    'stock_added' => 'Stock received and added to the product.',
 ];
 $flash = $flashMsgs[$_GET['msg'] ?? ''] ?? '';
 $flashError = '';
 if (($_GET['error'] ?? '') === 'has_products') {
     $flashError = 'Cannot delete — this category has products assigned to it.';
+}
+if (($_GET['error'] ?? '') === 'stock_invalid') {
+    $flashError = 'Stock was not added — the product was not found or the quantity was invalid.';
+}
+if (isset($_GET['imported'])) {
+    $flash = 'Import finished — ' . (int)$_GET['imported'] . ' added, '
+           . (int)($_GET['updated'] ?? 0) . ' updated, '
+           . (int)($_GET['skipped'] ?? 0) . ' skipped.';
+}
+if (($_GET['import_error'] ?? '') !== '') {
+    $flashError = match ($_GET['import_error']) {
+        'size'   => 'Import file is empty or bigger than 5 MB.',
+        'type'   => 'Import needs a .csv file.',
+        default  => 'The file could not be uploaded. Try again.',
+    };
 }
 
 $page_title = 'Inventory';
@@ -367,6 +420,19 @@ ob_start();
                 </select>
             </span>
         <?php endif; ?>
+        <?php if ($active_tab === 'products'): ?>
+        <button type="button" class="filter-btn secondary" data-bs-toggle="modal" data-bs-target="#restockModal">
+            <i class="fas fa-boxes-stacked"></i>Receive stock
+        </button>
+        <button type="button" class="filter-btn secondary" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="fas fa-file-export"></i>Export
+        </button>
+        <?php if ($isAdmin): ?>
+        <button type="button" class="filter-btn secondary" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="fas fa-file-import"></i>Import
+        </button>
+        <?php endif; ?>
+        <?php endif; ?>
         <?php if ($active_tab === 'products' && $isAdmin): ?>
         <button class="filter-btn" data-bs-toggle="modal" data-bs-target="#addProductModal">
             <i class="fas fa-plus"></i>Add product
@@ -386,6 +452,9 @@ ob_start();
     <?php if ($isAdmin): ?>
     <a class="inv-tab <?php echo $active_tab === 'categories' ? 'active' : ''; ?>" href="inventory.php?tab=categories<?php echo $currentStoreId > 0 ? '&store_id='.$currentStoreId : ''; ?>">
         <i class="fas fa-tags"></i>Categories<span class="badge"><?php echo count($categories); ?></span>
+    </a>
+    <a class="inv-tab" href="print_price_tags.php<?php echo $currentStoreId > 0 ? '?store_id='.$currentStoreId : ''; ?>">
+        <i class="fas fa-tag"></i>Price tags
     </a>
     <?php endif; ?>
 </div>
@@ -1119,6 +1188,47 @@ ob_start();
 </div>
 </div>
 
+<div class="modal fade" id="restockModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+<div class="modal-content">
+<form method="POST" id="restockForm" autocomplete="off">
+    <input type="hidden" name="action" value="add_stock">
+    <input type="hidden" name="product_id" id="rs_product_id" value="">
+    <input type="hidden" name="barcode" id="rs_barcode_hidden" value="">
+    <div class="modal-header">
+        <div>
+            <h5 class="modal-title" style="font-size:16px;font-weight:600;margin:0;">Receive stock</h5>
+            <p style="font-size:13px;color:var(--text-muted);margin:2px 0 0;">Scan the product barcode, then enter the quantity received.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;">
+        <label class="form-label" style="font-size:13px;font-weight:500;">Barcode</label>
+        <div class="d-flex gap-2">
+            <input type="text" id="rs_barcode" class="form-control" placeholder="Scan or type the barcode, then Enter" inputmode="numeric" style="height:40px;">
+            <button type="button" class="btn btn-dark" style="height:40px;white-space:nowrap;" onclick="restockLookup()">
+                <i class="fas fa-barcode me-1"></i>Find
+            </button>
+        </div>
+        <div id="rs_result" style="margin-top:10px;font-size:13px;min-height:20px;"></div>
+
+        <div id="rs_qty_wrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <label class="form-label" style="font-size:13px;font-weight:500;">Quantity received</label>
+            <input type="number" name="qty" id="rs_qty" class="form-control" min="1" max="100000" value="1" style="height:40px;">
+            <small style="display:block;margin-top:4px;font-size:12px;color:var(--text-subtle);">This quantity is added to the product's current stock.</small>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="rs_submit" disabled>
+            <i class="fas fa-plus me-1"></i>Add to stock
+        </button>
+    </div>
+</form>
+</div>
+</div>
+</div>
+
 <style>
 .btn-icon {
     display: inline-flex;
@@ -1308,6 +1418,91 @@ function checkBarcodeExists(input) {
         .catch(() => { box.innerHTML = ''; });
 }
 
+// ── Receive stock by barcode ─────────────────
+const RESTOCK_STORE_ID = <?php echo (int)$currentStoreId; ?>;
+let restockProduct = null;
+
+document.getElementById('restockModal')?.addEventListener('shown.bs.modal', function () {
+    restockProduct = null;
+    document.getElementById('rs_barcode').value = '';
+    document.getElementById('rs_barcode_hidden').value = '';
+    document.getElementById('rs_product_id').value = '';
+    document.getElementById('rs_result').innerHTML = '';
+    document.getElementById('rs_qty_wrap').style.display = 'none';
+    document.getElementById('rs_qty').value = '1';
+    document.getElementById('rs_submit').disabled = true;
+    document.getElementById('rs_barcode').focus();
+});
+
+function restockLookup() {
+    const code = (document.getElementById('rs_barcode').value || '').trim();
+    const box = document.getElementById('rs_result');
+    if (!code) { box.innerHTML = '<span style="color:var(--danger);">Scan or type a barcode first.</span>'; return; }
+
+    box.innerHTML = '<span style="color:var(--text-muted);">Looking up…</span>';
+    fetch('inventory.php?action=check_barcode&store_id=' + RESTOCK_STORE_ID + '&code=' + encodeURIComponent(code))
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) {
+                restockProduct = null;
+                document.getElementById('rs_product_id').value = '';
+                document.getElementById('rs_qty_wrap').style.display = 'none';
+                document.getElementById('rs_submit').disabled = true;
+                box.innerHTML = '<div style="padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:8px;">' +
+                    'No product uses this barcode here. Add the product first, then receive stock.</div>';
+                return;
+            }
+            restockProduct = d.product;
+            document.getElementById('rs_barcode_hidden').value = code;
+            document.getElementById('rs_product_id').value = d.product.id;
+            const stock = parseInt(d.product.stock_quantity, 10) || 0;
+            const threshold = parseInt(d.product.low_stock_threshold, 10) || 0;
+            const low = threshold > 0 && stock <= threshold;
+            box.innerHTML = '<div style="padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;">' +
+                '<div style="font-weight:600;">' + escapeHtml(d.product.name) + (low ? ' <span style="font-size:11px;font-weight:500;padding:1px 6px;border-radius:6px;border:1px solid var(--border);color:var(--text-muted);">Low stock</span>' : '') + '</div>' +
+                '<div style="color:var(--text-muted);font-size:12px;margin-top:2px;">' +
+                    (d.product.sku ? 'SKU ' + escapeHtml(d.product.sku) + ' · ' : '') + 'Current stock: ' + stock +
+                '</div>' +
+                '<div id="rs_preview" style="margin-top:6px;font-size:12px;">New stock after adding: <strong>' + (stock + 1) + '</strong></div>' +
+                '</div>';
+            document.getElementById('rs_qty_wrap').style.display = '';
+            const qtyEl = document.getElementById('rs_qty');
+            qtyEl.value = '1';
+            qtyEl.focus();
+            qtyEl.select();
+            document.getElementById('rs_submit').disabled = false;
+            updateRestockPreview();
+        })
+        .catch(() => {
+            box.innerHTML = '<span style="color:var(--danger);">Lookup failed. Check the connection and try again.</span>';
+        });
+}
+
+function updateRestockPreview() {
+    if (!restockProduct) return;
+    const preview = document.getElementById('rs_preview');
+    if (!preview) return;
+    const qty = Math.max(1, Math.min(100000, parseInt(document.getElementById('rs_qty').value, 10) || 1));
+    const stock = parseInt(restockProduct.stock_quantity, 10) || 0;
+    preview.innerHTML = 'New stock after adding: <strong>' + (stock + qty) + '</strong>';
+}
+
+document.getElementById('rs_barcode')?.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); restockLookup(); }
+});
+document.getElementById('rs_qty')?.addEventListener('input', updateRestockPreview);
+
+document.getElementById('restockForm')?.addEventListener('submit', function (e) {
+    if (!restockProduct) { e.preventDefault(); return; }
+    const qty = parseInt(document.getElementById('rs_qty').value, 10) || 0;
+    if (qty < 1 || qty > 100000) {
+        e.preventDefault();
+        alert('Enter a quantity between 1 and 100000.');
+        return;
+    }
+    document.getElementById('rs_submit').disabled = true;
+});
+
 function escapeHtml(s) {
     const d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -1316,5 +1511,19 @@ function escapeHtml(s) {
 </script>
 
 <?php
+$expDataset         = 'inventory';
+$expLabel           = 'inventory';
+$expRowCount        = $totalCount;
+$expFilters         = [
+    'store_id'     => $currentStoreId,
+    'search'       => $search,
+    'category_id'  => $category_id,
+    'stock_filter' => $stock_filter,
+];
+$expCanImport       = $isAdmin;
+$expImportStoreId   = $currentStoreId > 0 ? $currentStoreId : (int)($_SESSION['store_id'] ?? 1);
+$expImportStoreName = $currentStoreName;
+include __DIR__ . '/views/partials/data-import-export.php';
+
 $content = ob_get_clean();
 include __DIR__ . '/views/layouts/main.php';

@@ -131,9 +131,6 @@ try {
             <li><a class="nav-link <?php echo $_self==='inventory.php'?'active':''; ?>" href="/pos/admin/inventory.php">
                 <i class="fas fa-layer-group"></i> Inventory
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='print_price_tags.php'?'active':''; ?>" href="/pos/admin/print_price_tags.php">
-                <i class="fas fa-tags"></i> Price tags
-            </a></li>
             <li><a class="nav-link <?php echo $_self==='transactions.php'?'active':''; ?>" href="/pos/admin/transactions.php">
                 <i class="fas fa-file-lines"></i> Transactions
             </a></li>
@@ -164,8 +161,11 @@ try {
                     <?php endif; ?>
                 </a>
             </li>
-            <li><a class="nav-link <?php echo $_self==='view_shifts.php'?'active':''; ?>" href="/pos/view_shifts.php">
-                <i class="fas fa-calendar"></i> Shifts
+            <li><a class="nav-link <?php echo $_self==='shift_register.php'?'active':''; ?>" href="/pos/shift_register.php">
+                <i class="fas fa-clock-rotate-left"></i> Shifts
+            </a></li>
+            <li><a class="nav-link <?php echo $_self==='integrations.php'?'active':''; ?>" href="/pos/integrations.php">
+                <i class="fas fa-exchange-alt"></i> Integrations
             </a></li>
             <li><a class="nav-link <?php echo $_self==='advertisements.php'?'active':''; ?>" href="/pos/admin/advertisements.php">
                 <i class="fas fa-tv"></i> Digital signage
@@ -198,6 +198,9 @@ try {
             <li><a class="nav-link" href="/pos/superadmin/system.php">
                 <i class="fas fa-hard-drive"></i> System
             </a></li>
+            <li><a class="nav-link" href="/pos/integrations.php">
+                <i class="fas fa-exchange-alt"></i> Integrations
+            </a></li>
         </ul>
         <?php endif; ?>
         <?php endif; ?>
@@ -207,8 +210,8 @@ try {
 <div class="main-content">
     <nav class="top-navbar">
         <div class="d-flex align-items-center gap-2">
-            <!-- Mobile sidebar toggle button (hidden on desktop) -->
-            <button type="button" class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebarCollapseBtn" style="padding:5px 9px;" title="Toggle menu" onclick="window.toggleSidebar();">
+            <!-- Sidebar toggle: overlay on mobile, icon rail on desktop -->
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="sidebarCollapseBtn" style="padding:5px 9px;" title="Toggle menu" aria-label="Toggle menu" onclick="window.toggleSidebar();">
                 <i class="fas fa-bars" style="font-size:.8rem;"></i>
             </button>
             <div class="topbar-search d-none d-md-block">
@@ -253,6 +256,21 @@ try {
 <script src="/pos/assets/js/bootstrap.bundle.min.js"></script>
 <script src="/pos/assets/js/theme-toggle.js"></script>
 <script>
+// Show nav labels as tooltips while the sidebar is in icon-rail mode
+function syncSidebarTitles() {
+    var sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    var collapsed = sidebar.classList.contains('collapsed');
+    sidebar.querySelectorAll('.nav-link').forEach(function (link) {
+        if (collapsed) {
+            var label = link.textContent.replace(/\s+/g, ' ').trim();
+            if (label) link.setAttribute('title', label);
+        } else {
+            link.removeAttribute('title');
+        }
+    });
+}
+
 // Global sidebar toggle function
 window.toggleSidebar = function() {
     var sidebar = document.getElementById('sidebar');
@@ -270,6 +288,10 @@ window.toggleSidebar = function() {
             if (backdrop) backdrop.classList.remove('show');
             document.body.style.overflow = '';
         } else {
+            // Opening the overlay: always show the full-width menu
+            sidebar.classList.remove('collapsed');
+            if (mainContent) mainContent.classList.remove('sidebar-collapsed');
+            syncSidebarTitles();
             sidebar.classList.add('show');
             if (backdrop) backdrop.classList.add('show');
             document.body.style.overflow = 'hidden';
@@ -282,6 +304,7 @@ window.toggleSidebar = function() {
         // Save state
         var collapsed = sidebar.classList.contains('collapsed');
         localStorage.setItem('sidebar_collapsed', collapsed);
+        syncSidebarTitles();
     }
 };
 
@@ -293,9 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Restore collapsed state
     var isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
-    if (isCollapsed && sidebar && mainContent) {
+    if (isCollapsed && sidebar && mainContent && window.innerWidth >= 992) {
         sidebar.classList.add('collapsed');
         mainContent.classList.add('sidebar-collapsed');
+        syncSidebarTitles();
     }
     
     // Close mobile sidebar when clicking backdrop
@@ -331,5 +355,6 @@ document.addEventListener('keydown', function (e) {
     }
 });
 </script>
+<?php include __DIR__ . '/../../../views/partials/support_chat.php'; ?>
 </body>
 </html>

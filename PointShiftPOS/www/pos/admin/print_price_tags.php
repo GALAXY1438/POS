@@ -85,6 +85,13 @@ ob_start();
 ?>
 
 <style>
+/* Same tab bar as the Inventory page */
+.inv-tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.inv-tab { display:inline-flex; align-items:center; gap:6px; padding:8px 2px; margin-right:18px; font-size:13px; font-weight:500; color:var(--text-muted); text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s ease, border-color .15s ease; }
+.inv-tab:hover { color:var(--text); }
+.inv-tab.active { color:var(--text); border-bottom-color:var(--text); }
+.inv-tab .badge { font-size:11px; font-weight:500; padding:1px 6px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-muted); }
+
 .pt-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .pt-header h5 { font-size: 24px; font-weight: 600; line-height: 1.25; margin: 0; color: var(--text); }
 .pt-header p { font-size: 14px; color: var(--text-muted); margin: 4px 0 0; }
@@ -313,6 +320,18 @@ ob_start();
     margin: 0 0 14px;
 }
 </style>
+
+<div class="inv-tabs">
+    <a class="inv-tab" href="inventory.php<?php echo $storeId > 0 ? '?store_id='.$storeId : ''; ?>">
+        <i class="fas fa-box"></i>Products
+    </a>
+    <a class="inv-tab" href="inventory.php?tab=categories<?php echo $storeId > 0 ? '&store_id='.$storeId : ''; ?>">
+        <i class="fas fa-tags"></i>Categories
+    </a>
+    <a class="inv-tab active" href="print_price_tags.php<?php echo $storeId > 0 ? '?store_id='.$storeId : ''; ?>">
+        <i class="fas fa-tag"></i>Price tags
+    </a>
+</div>
 
 <div class="pt-header">
     <div>

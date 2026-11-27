@@ -114,9 +114,22 @@ class POSController
         }
     }
 
-    public function createOrder(array $items, string $paymentMethod = 'cash', float $amountReceived = 0, float $discountPercent = 0, string $customerName = '', string $customerPhone = ''): array
+    public function createOrder(array $items, string $paymentMethod = 'cash', float $amountReceived = 0, float $discountPercent = 0, string $customerName = '', string $customerPhone = '', ?int $registerShiftId = null): array
     {
         try {
+            $shiftId = $registerShiftId;
+            if (PosSecurity::roleIsRestricted()) {
+                $shift = ShiftManager::current();
+                if (!$shift) {
+                    return [
+                        'success'    => false,
+                        'needs_shift' => true,
+                        'message'    => 'Open a shift before making sales.',
+                    ];
+                }
+                $shiftId = (int)$shift['id'];
+            }
+
             $this->db->beginTransaction();
 
             // Handle customer creation if details provided
@@ -144,6 +157,11 @@ class POSController
                 }
                 if ((int)$prod['stock_quantity'] < $item['qty']) {
                     $this->db->rollBack();
+                    AuditLog::log('sale.failed', 'Sale blocked: insufficient stock for "' . $prod['name'] . '".', [
+                        'product_id' => (int)$item['id'],
+                        'available'  => (int)$prod['stock_quantity'],
+                        'requested'  => $item['qty'],
+                    ]);
                     return ['success' => false, 'message' => 'Insufficient stock for "'.($prod['name']).'". Available: '.(int)$prod['stock_quantity'].', requested: '.$item['qty']];
                 }
             }
@@ -164,8 +182,8 @@ class POSController
                 INSERT INTO orders
                     (order_number, user_id, customer_id, customer_name, customer_phone, store_id, subtotal,
                      discount_percent, discount_amount, tax_amount, total_amount, payment_method,
-                     amount_received, status, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?)
+                     amount_received, status, created_at, register_shift_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?)
             ");
             $storeId = (int)($_SESSION['store_id'] ?? 1);
             $stmt->execute([
@@ -183,6 +201,7 @@ class POSController
                 $paymentMethod,
                 $amountReceived,
                 $now,
+                $shiftId,
             ]);
             $orderId = (int) $this->db->lastInsertId();
 
@@ -201,6 +220,32 @@ class POSController
             }
 
             $this->db->commit();
+
+            AuditLog::log('sale.completed', "Sale {$orderNumber} completed for " . number_format((float)$total, 2, '.', '') . " ({$paymentMethod}).", [
+                'order_id'      => $orderId,
+                'order_number'  => $orderNumber,
+                'subtotal'      => $subtotal,
+                'discount'      => $discountAmount,
+                'total'         => $total,
+                'payment'       => $paymentMethod,
+                'shift_id'      => $shiftId,
+                'items'         => array_map(fn($i) => [
+                    'id' => (int)$i['id'], 'name' => $i['name'] ?? '', 'qty' => (int)$i['qty'], 'price' => $i['price'],
+                ], $items),
+            ]);
+
+            try {
+                Integrations::fire('sale.completed', [
+                    'order_number' => $orderNumber,
+                    'total'        => $total,
+                    'payment'      => $paymentMethod,
+                    'store_id'     => $storeId,
+                    'shift_id'     => $shiftId,
+                    'items'        => array_map(fn($i) => ['id' => (int)$i['id'], 'qty' => (int)$i['qty'], 'price' => $i['price']], $items),
+                ]);
+            } catch (Throwable $e) {
+                // Webhooks must never fail a sale.
+            }
 
             // Refresh in-app stock alerts and queue/send SMS alerts.
             try {
