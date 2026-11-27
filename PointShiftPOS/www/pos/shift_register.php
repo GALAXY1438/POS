@@ -302,6 +302,8 @@ ob_start();
 $content = ob_get_clean();
 if ($isAdmin) {
     include __DIR__ . '/admin/views/layouts/main.php';
+} elseif (User::isStaff()) {
+    include __DIR__ . '/staff/views/layout.php';
 } else {
-    include 'layout.php';
+    include __DIR__ . '/cashier/views/layout.php';
 }

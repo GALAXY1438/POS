@@ -28,6 +28,7 @@ $_displayName = Layout::getDisplayName();
 $_self        = basename($_SERVER['PHP_SELF']);
 $_role        = $_SESSION['role'] ?? 'cashier';
 $_isStaff     = $_role === ROLE_STAFF;
+$_base        = $_isStaff ? '/pos/staff/' : '/pos/cashier/';
 
 /* Store name for cashier/staff */
 $_storeName = '';
@@ -58,28 +59,28 @@ try {
     <nav class="sidebar-nav">
         <div class="sidebar-section-label">Main</div>
         <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link <?php echo $_self==='pos.php'?'active':''; ?>" href="pos.php">
+            <li><a class="nav-link <?php echo $_self==='pos.php'?'active':''; ?>" href="<?php echo $_base; ?>pos.php">
                 <i class="fas fa-cash-register"></i> Point of sale
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='dashboard.php'?'active':''; ?>" href="<?php echo $_isStaff ? '/pos/staff/dashboard.php' : 'dashboard.php'; ?>">
+            <li><a class="nav-link <?php echo $_self==='dashboard.php'?'active':''; ?>" href="<?php echo $_base; ?>dashboard.php">
                 <i class="fas fa-chart-line"></i> Analytics
             </a></li>
             <li><a class="nav-link <?php echo $_self==='shift_register.php'?'active':''; ?>" href="/pos/shift_register.php">
                 <i class="fas fa-clock-rotate-left"></i> My shift
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='transactions.php'?'active':''; ?>" href="transactions.php">
+            <li><a class="nav-link <?php echo $_self==='transactions.php'?'active':''; ?>" href="<?php echo $_base; ?>transactions.php">
                 <i class="fas fa-file-lines"></i> Transactions
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='inventory.php'?'active':''; ?>" href="inventory.php">
+            <li><a class="nav-link <?php echo $_self==='inventory.php'?'active':''; ?>" href="<?php echo $_base; ?>inventory.php">
                 <i class="fas fa-layer-group"></i> View inventory
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='sales.php'?'active':''; ?>" href="sales.php">
+            <li><a class="nav-link <?php echo $_self==='sales.php'?'active':''; ?>" href="<?php echo $_base; ?>sales.php">
                 <i class="fas fa-chart-bar"></i> Sales
             </a></li>
         </ul>
         <div class="sidebar-section-label">Account</div>
         <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link <?php echo $_self==='account_settings.php'?'active':''; ?>" href="account_settings.php">
+            <li><a class="nav-link <?php echo $_self==='account_settings.php'?'active':''; ?>" href="<?php echo $_base; ?>account_settings.php">
                 <i class="fas fa-circle-user"></i> Account
             </a></li>
         </ul>
@@ -113,7 +114,7 @@ try {
                             <div style="font-size:.72rem;color:var(--text-secondary);"><?php echo $_isStaff ? 'Staff' : 'Cashier'; ?></div>
                         </div>
                     </li>
-                    <li><a class="dropdown-item" href="account_settings.php"><i class="fas fa-circle-user me-2"></i>Account</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $_base; ?>account_settings.php"><i class="fas fa-circle-user me-2"></i>Account</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="/pos/logout.php"><i class="fas fa-arrow-right-from-bracket me-2"></i>Logout</a></li>
                 </ul>

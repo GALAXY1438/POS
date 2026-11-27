@@ -27,6 +27,7 @@ $_initials    = Layout::getInitials();
 $_displayName = Layout::getDisplayName();
 $_self        = basename($_SERVER['PHP_SELF']);
 $db           = $db ?? Database::getInstance()->getConnection();
+$_base        = '/pos/staff/';
 
 /* Store name */
 $_storeName = '';
@@ -57,40 +58,40 @@ try {
     <nav class="sidebar-nav">
         <div class="sidebar-section-label">Main</div>
         <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link <?php echo $_self==='dashboard.php'?'active':''; ?>" href="dashboard.php">
+            <li><a class="nav-link <?php echo $_self==='dashboard.php'?'active':''; ?>" href="<?php echo $_base; ?>dashboard.php">
                 <i class="fas fa-table-cells-large"></i> Dashboard
             </a></li>
             <li><a class="nav-link <?php echo $_self==='inventory.php'?'active':''; ?>" href="/pos/admin/inventory.php">
                 <i class="fas fa-layer-group"></i> Inventory
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='stock_monitoring.php'?'active':''; ?>" href="stock_monitoring.php">
+            <li><a class="nav-link <?php echo $_self==='stock_monitoring.php'?'active':''; ?>" href="<?php echo $_base; ?>stock_monitoring.php">
                 <i class="fas fa-gauge"></i> Stock monitoring
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='barcode_scanner.php'?'active':''; ?>" href="barcode_scanner.php">
+            <li><a class="nav-link <?php echo $_self==='barcode_scanner.php'?'active':''; ?>" href="<?php echo $_base; ?>barcode_scanner.php">
                 <i class="fas fa-barcode"></i> Barcode scanner
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='low_stock_alerts.php'?'active':''; ?>" href="low_stock_alerts.php">
+            <li><a class="nav-link <?php echo $_self==='low_stock_alerts.php'?'active':''; ?>" href="<?php echo $_base; ?>low_stock_alerts.php">
                 <i class="fas fa-bell"></i> Low stock
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='inventory_reports.php'?'active':''; ?>" href="inventory_reports.php">
+            <li><a class="nav-link <?php echo $_self==='inventory_reports.php'?'active':''; ?>" href="<?php echo $_base; ?>inventory_reports.php">
                 <i class="fas fa-chart-bar"></i> Reports
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='pos.php'?'active':''; ?>" href="pos.php">
+            <li><a class="nav-link <?php echo $_self==='pos.php'?'active':''; ?>" href="<?php echo $_base; ?>pos.php">
                 <i class="fas fa-cash-register"></i> Point of sale
             </a></li>
             <li><a class="nav-link <?php echo $_self==='shift_register.php'?'active':''; ?>" href="/pos/shift_register.php">
                 <i class="fas fa-clock-rotate-left"></i> My shift
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='transactions.php'?'active':''; ?>" href="transactions.php">
+            <li><a class="nav-link <?php echo $_self==='transactions.php'?'active':''; ?>" href="<?php echo $_base; ?>transactions.php">
                 <i class="fas fa-file-lines"></i> Transactions
             </a></li>
         </ul>
         <div class="sidebar-section-label">Account</div>
         <ul class="nav flex-column list-unstyled">
-            <li><a class="nav-link <?php echo $_self==='email.php'?'active':''; ?>" href="email.php">
+            <li><a class="nav-link <?php echo $_self==='email.php'?'active':''; ?>" href="<?php echo $_base; ?>email.php">
                 <i class="fas fa-envelope"></i> Email Admin
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='account_settings.php'?'active':''; ?>" href="account_settings.php">
+            <li><a class="nav-link <?php echo $_self==='account_settings.php'?'active':''; ?>" href="<?php echo $_base; ?>account_settings.php">
                 <i class="fas fa-circle-user"></i> Account
             </a></li>
         </ul>
@@ -125,7 +126,7 @@ try {
                             <div style="font-size:.72rem;color:var(--text-secondary);">Staff</div>
                         </div>
                     </li>
-                    <li><a class="dropdown-item" href="account_settings.php"><i class="fas fa-circle-user me-2"></i>Account</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $_base; ?>account_settings.php"><i class="fas fa-circle-user me-2"></i>Account</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="/pos/logout.php"><i class="fas fa-arrow-right-from-bracket me-2"></i>Logout</a></li>
                 </ul>

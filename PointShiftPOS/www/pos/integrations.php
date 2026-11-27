@@ -8,8 +8,7 @@ User::requireLogin();
 
 $isSA = ($_SESSION['role'] ?? '') === ROLE_SUPER_ADMIN;
 if (!User::isAdmin() && !$isSA) {
-    header('Location: ../dashboard.php');
-    exit();
+    User::redirectToDashboard();
 }
 
 $db = Database::getInstance()->getConnection();
