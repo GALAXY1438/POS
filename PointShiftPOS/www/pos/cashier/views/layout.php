@@ -147,6 +147,7 @@ try {
     });
 })();
 </script>
+<?php include __DIR__ . '/../../views/partials/pos_confirm.php'; ?>
 <?php include __DIR__ . '/../../views/partials/support_chat.php'; ?>
 </body>
 </html>

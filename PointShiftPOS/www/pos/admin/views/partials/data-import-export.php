@@ -151,7 +151,7 @@ $expKey     = 'exp_cols_' . $expDataset;
         boxes().forEach(function (b) { if (b.checked) picked.push(b.value); });
         if (!picked.length) {
             e.preventDefault();
-            alert('Pick at least one column to export.');
+            posAlert('Pick at least one column to export.');
             return;
         }
         try { localStorage.setItem(KEY, JSON.stringify(picked)); } catch (err) {}

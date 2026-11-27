@@ -891,7 +891,7 @@ function printReport() {
 function printReceiptPanel() {
     <?php if ($receipt): ?>
     serverPrintReceipt(<?php echo (int)$receipt['id']; ?>).then(function (d) {
-        if (!d.success) alert('Print failed: ' + d.message);
+        if (!d.success) posAlert('Print failed: ' + d.message);
     });
     <?php endif; ?>
 }
@@ -956,7 +956,7 @@ function buildReceiptContent(data) {
 /* ── Print receipt by ID ── */
 function printReceiptById(orderId) {
     serverPrintReceipt(orderId).then(function (d) {
-        if (!d.success) alert('Print failed: ' + d.message);
+        if (!d.success) posAlert('Print failed: ' + d.message);
     });
 }
 

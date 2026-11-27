@@ -634,7 +634,9 @@ ob_start();
                             <button class="btn-icon" onclick="editCategory(<?php echo htmlspecialchars(json_encode($cat)); ?>)" title="Edit" aria-label="Edit">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Delete this category?');">
+                            <form method="POST" style="display:inline;"
+                                  data-confirm="Delete the category &quot;<?php echo htmlspecialchars($cat['name']); ?>&quot;? Categories with products cannot be deleted."
+                                  data-confirm-ok="Delete" data-confirm-danger>
                                 <input type="hidden" name="action" value="delete_category">
                                 <input type="hidden" name="cat_id" value="<?php echo $cat['id']; ?>">
                                 <button type="submit" class="btn-icon btn-danger" title="Delete" aria-label="Delete">
@@ -1360,13 +1362,15 @@ function editProduct(product) {
 }
 
 function deleteProduct(productId, productName) {
-    if (confirm('Delete "' + productName + '"?\n\nThis action cannot be undone.')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.innerHTML = '<input type="hidden" name="action" value="delete_product"><input type="hidden" name="product_id" value="' + productId + '">';
-        document.body.appendChild(form);
-        form.submit();
-    }
+    posConfirm('Delete "' + productName + '"? This action cannot be undone.', { ok: 'Delete', danger: true, title: 'Delete product?' })
+        .then(function (ok) {
+            if (!ok) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = '<input type="hidden" name="action" value="delete_product"><input type="hidden" name="product_id" value="' + productId + '">';
+            document.body.appendChild(form);
+            form.submit();
+        });
 }
 
 // ── Barcode scanner helpers ───────────────────
@@ -1497,7 +1501,7 @@ document.getElementById('restockForm')?.addEventListener('submit', function (e) 
     const qty = parseInt(document.getElementById('rs_qty').value, 10) || 0;
     if (qty < 1 || qty > 100000) {
         e.preventDefault();
-        alert('Enter a quantity between 1 and 100000.');
+        posAlert('Enter a quantity between 1 and 100000.');
         return;
     }
     document.getElementById('rs_submit').disabled = true;

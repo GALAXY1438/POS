@@ -1535,7 +1535,7 @@ function buildReceiptInWindow(order, method, amtRecv) {
     // Open popup window
     const w = window.open('', '_blank', 'width=420,height=700,scrollbars=yes');
     if (!w) {
-        alert('Please allow popups to view receipt');
+        posAlert('Please allow popups to view the receipt.');
         return;
     }
     
@@ -1609,7 +1609,7 @@ function printReceiptWindow() {
     const receiptHtml = document.getElementById('receipt-body').innerHTML;
     const w = window.open('', '_blank', 'width:420,height=700,scrollbars=yes');
     if (!w) {
-        alert('Please allow popups for printing');
+        posAlert('Please allow popups for printing.');
         return;
     }
     w.document.write('<!DOCTYPE html><html><head><title>Receipt</title>');

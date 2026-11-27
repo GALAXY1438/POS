@@ -375,13 +375,13 @@ document.getElementById('passwordForm')?.addEventListener('submit', function(e) 
     
     if (newPass !== confirmPass) {
         e.preventDefault();
-        alert('New passwords do not match.');
+        posAlert('New passwords do not match.');
         return false;
     }
     
     if (newPass.length < 6) {
         e.preventDefault();
-        alert('Password must be at least 6 characters long.');
+        posAlert('Password must be at least 6 characters long.');
         return false;
     }
 });

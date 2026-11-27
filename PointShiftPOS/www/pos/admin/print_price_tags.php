@@ -488,7 +488,7 @@ function printAllSelectedTags() {
     });
 
     if (selected.length === 0) {
-        alert('Select at least one product first.');
+        posAlert('Select at least one product first.');
         return;
     }
     openTagSheet(selected);

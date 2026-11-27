@@ -497,9 +497,9 @@ ob_start();
 
 <script>
 function posConfirmThenSubmit(message, formId) {
-    if (confirm(message)) {
-        document.getElementById(formId).submit();
-    }
+    posConfirm(message, { ok: 'Delete', danger: true }).then(function (ok) {
+        if (ok) document.getElementById(formId).submit();
+    });
 }
 
 function editStore(s) {

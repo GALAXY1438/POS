@@ -150,7 +150,9 @@ ob_start();
         <span class="sr-badge">Opened <?php echo htmlspecialchars(date('H:i', strtotime($shift['opened_at']))); ?></span>
     </div>
     <div class="sr-body">
-        <form method="POST" class="row g-3 align-items-end">
+        <form method="POST" class="row g-3 align-items-end"
+              data-confirm="Close this shift and lock the till? You will need to open a new shift to sell again."
+              data-confirm-ok="Close shift">
             <input type="hidden" name="action" value="close">
             <input type="hidden" name="shift_id" value="<?php echo (int)$shift['id']; ?>">
             <div class="col-md-3">
@@ -167,7 +169,7 @@ ob_start();
                 <input type="text" class="form-control" name="notes" placeholder="e.g. handed over to supervisor">
             </div>
             <div class="col-md-3">
-                <button type="submit" class="btn btn-dark w-100" onclick="return confirm('Close this shift and lock the till?');">
+                <button type="submit" class="btn btn-dark w-100">
                     <i class="fas fa-lock me-1"></i>Close shift
                 </button>
             </div>

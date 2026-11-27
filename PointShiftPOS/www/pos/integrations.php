@@ -303,12 +303,16 @@ ob_start();
             <?php elseif ($apiKey !== ''): ?>
             <div class="int-key mb-2"><?php echo htmlspecialchars(substr($apiKey, 0, 8) . str_repeat('•', 16) . substr($apiKey, -4)); ?></div>
             <?php endif; ?>
-            <form method="POST" class="d-flex gap-2 mb-3" onsubmit="return confirm('<?php echo $apiKey !== '' ? 'Replace the existing API key?' : 'Generate a new API key?'; ?>');">
+            <form method="POST" class="d-flex gap-2 mb-3"
+                  data-confirm="<?php echo $apiKey !== '' ? 'Replace the existing API key? The old key will stop working.' : 'Generate a new API key?'; ?>"
+                  data-confirm-ok="<?php echo $apiKey !== '' ? 'Replace' : 'Generate'; ?>">
                 <input type="hidden" name="action" value="gen_api_key">
                 <button class="btn btn-dark btn-sm flex-fill"><i class="fas fa-rotate me-1"></i><?php echo $apiKey !== '' ? 'Replace key' : 'Generate key'; ?></button>
             </form>
             <?php if ($apiKey !== ''): ?>
-            <form method="POST" class="mb-3" onsubmit="return confirm('Revoke the API key? External systems using it will stop working.');">
+            <form method="POST" class="mb-3"
+                  data-confirm="Revoke the API key? External systems using it will stop working."
+                  data-confirm-ok="Revoke" data-confirm-danger>
                 <input type="hidden" name="action" value="revoke_api_key">
                 <button class="btn btn-outline-danger btn-sm w-100"><i class="fas fa-trash me-1"></i>Revoke key</button>
             </form>

@@ -477,7 +477,9 @@ ob_start();
                 <!-- <td><?=htmlspecialchars($p['status'] ?? '')?></td> -->
                 <td>
                     <button class="btn btn-primary btn-sm" onclick="editProduct(<?=htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8')?>)">Edit</button>
-                    <a href="?delete=<?=$p['id']?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')">Delete</a>
+                    <a href="?delete=<?=$p['id']?>" class="btn btn-danger btn-sm"
+                       data-confirm="Delete this product? This cannot be undone."
+                       data-confirm-ok="Delete" data-confirm-danger>Delete</a>
                 </td>
             </tr>
             <?php endforeach; ?>

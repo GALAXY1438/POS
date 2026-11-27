@@ -2157,7 +2157,8 @@ document.getElementById('licenceCopy').addEventListener('click', function () {
         A safety backup of the current data is saved automatically first. You will be signed out after the restore.
     </div>
     <form method="POST" enctype="multipart/form-data"
-          onsubmit="return confirm('Restore this backup?\n\nAll current products, sales and users will be replaced. A safety backup will be saved first.');">
+          data-confirm="Restore this backup? All current products, sales and users will be replaced. A safety backup will be saved first."
+          data-confirm-ok="Restore" data-confirm-danger>
         <input type="hidden" name="action" value="restore_backup">
         <div class="row g-3 align-items-end">
             <div class="col-md-6">
@@ -2298,7 +2299,9 @@ try {
         <?php if ($secFpCred): ?>
             <span class="badge bg-success">Enrolled</span>
             <span style="font-size:.8rem;color:var(--text-secondary);">Enrolled <?php echo htmlspecialchars($secFpAt ?: 'on this device'); ?>.</span>
-            <form method="POST" style="margin-left:auto;" onsubmit="return confirm('Remove the approval fingerprint from this installation?');">
+            <form method="POST" style="margin-left:auto;"
+                  data-confirm="Remove the approval fingerprint from this installation?"
+                  data-confirm-ok="Remove" data-confirm-danger>
                 <input type="hidden" name="action" value="unenroll_fingerprint">
                 <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash me-1"></i>Remove</button>
             </form>
@@ -2323,11 +2326,15 @@ try {
         <div style="font-size:.72rem;color:var(--text-subtle);margin-top:4px;">Created <?php echo htmlspecialchars($secBarcodeAt ?: 'recently'); ?>. Print it and keep it with a manager.</div>
         <div class="d-flex gap-2 mt-3">
             <button type="button" class="btn btn-dark btn-sm" onclick="printApprovalBarcode()"><i class="fas fa-print me-1"></i>Print barcode</button>
-            <form method="POST" onsubmit="return confirm('Generate a new barcode? The old one will stop working.');">
+            <form method="POST"
+                  data-confirm="Generate a new barcode? The old one will stop working."
+                  data-confirm-ok="Regenerate">
                 <input type="hidden" name="action" value="generate_approval_barcode">
                 <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="fas fa-rotate me-1"></i>Regenerate</button>
             </form>
-            <form method="POST" onsubmit="return confirm('Revoke the approval barcode?');">
+            <form method="POST"
+                  data-confirm="Revoke the approval barcode? Scanning it will stop approving actions."
+                  data-confirm-ok="Revoke" data-confirm-danger>
                 <input type="hidden" name="action" value="revoke_approval_barcode">
                 <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash me-1"></i>Revoke</button>
             </form>
@@ -2784,9 +2791,9 @@ function deleteUser(id, username) {
 
 // ── Store Management Functions ────────────────────────────
 function posConfirmThenSubmit(message, formId) {
-    if (confirm(message)) {
+    posConfirm(message, function () {
         document.getElementById(formId).submit();
-    }
+    });
 }
 
 function editStore(s) {
