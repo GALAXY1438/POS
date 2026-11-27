@@ -7,7 +7,6 @@
  * registry from the vendor keystore when that folder is present.
  */
 require_once __DIR__ . '/../config.php';
-User::requireLogin();
 User::requireSuperAdmin();
 
 $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
@@ -269,7 +268,8 @@ ob_start();
         <ol style="margin:0 0 12px 18px;padding:0;">
             <li>In GitHub open <strong>Actions → Issue licence → Run workflow</strong>.</li>
             <li>Enter the customer, this machine ID, and either subscription days or a one-time licence.</li>
-            <li>The signed key appears in the run summary (and as a downloadable artifact). Save the record under <code>keystore/issued/&lt;Customer&gt;/</code>.</li>
+            <li>Add the client's phone and/or email to send the key automatically by SMS/email, or leave both blank to issue only.</li>
+            <li>The signed key and delivery status appear in the run summary (and the key as a downloadable artifact). Save the record under <code>keystore/issued/&lt;Customer&gt;/</code>.</li>
         </ol>
         <p style="margin:0 0 8px;">
             The workflow signs with the repository secret <code>LICENCE_PRIVATE_KEY</code> (contents of

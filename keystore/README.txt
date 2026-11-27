@@ -36,10 +36,20 @@ GitHub Actions (from any device)
   1. Add a repository secret named LICENCE_PRIVATE_KEY containing the full
      text of signing\license_private.pem (Settings → Secrets and variables →
      Actions). It is encrypted by GitHub and never printed in logs.
-  2. Open Actions → "Issue licence" → Run workflow, fill in the customer,
-     machine ID and subscription length (or choose perpetual).
-  3. The signed key appears in the run summary and as a downloadable
-     "licence-key" artifact. Save that record under issued\<Customer>\.
+  2. Optional automatic delivery secrets:
+       SMS     BLESSEDTEXTS_API_KEY, BLESSEDTEXTS_SENDER_ID
+       Email   SMTP_HOST, SMTP_PORT, SMTP_SECURITY (tls or ssl), SMTP_USER,
+               SMTP_PASS, LICENCE_FROM_EMAIL, LICENCE_FROM_NAME
+     Use company-owned sending accounts, not a customer's in-app SMS settings.
+  3. Open Actions → "Issue licence" → Run workflow. Fill in the customer,
+     machine ID and subscription length (or choose perpetual). Add the client's
+     phone and/or email to send the signed key automatically; leave both blank
+     to issue without sending.
+  4. The signed key appears in the run summary and as a downloadable
+     "licence-key" artifact. Delivery status is added to the summary. If a
+     requested delivery fails, the run is marked failed but the artifact is
+     still uploaded so the key can be sent manually.
+  5. Save the artifact under issued\<Customer>\ for recovery and re-sending.
   Workflows can only be started by people with write access to this repo.
 
 GUI (easiest on the office PC)

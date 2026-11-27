@@ -1,8 +1,8 @@
 name: Issue licence
 
-# Signs a customer licence key for a given machine ID.
-# Requires the repository secret LICENCE_PRIVATE_KEY = contents of
-# keystore/signing/license_private.pem. Run from Actions → Issue licence.
+# Signs a customer licence key for a given machine ID, then delivers it to
+# any client phone/email supplied. Requires LICENCE_PRIVATE_KEY; SMS and SMTP
+# secrets are only needed when those delivery channels are used.
 on:
   workflow_dispatch:
     inputs:
@@ -25,6 +25,12 @@ on:
         default: ""
       key_id:
         description: Key ID (optional, e.g. TS-2026-001)
+        default: ""
+      phone:
+        description: Client phone for automatic SMS (optional, e.g. 07XXXXXXXX)
+        default: ""
+      email:
+        description: Client email for automatic delivery (optional)
         default: ""
 
 permissions:
@@ -78,7 +84,26 @@ jobs:
             echo "Save this record under keystore/issued/<Customer>/ so it can be re-sent later."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Deliver licence
+        env:
+          LICENCE_FILE: ${{ runner.temp }}/licence.txt
+          CUSTOMER: ${{ inputs.customer }}
+          MACHINE: ${{ inputs.machine }}
+          PHONE: ${{ inputs.phone }}
+          EMAIL: ${{ inputs.email }}
+          BLESSEDTEXTS_API_KEY: ${{ secrets.BLESSEDTEXTS_API_KEY }}
+          BLESSEDTEXTS_SENDER_ID: ${{ secrets.BLESSEDTEXTS_SENDER_ID }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURITY: ${{ secrets.SMTP_SECURITY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          LICENCE_FROM_EMAIL: ${{ secrets.LICENCE_FROM_EMAIL }}
+          LICENCE_FROM_NAME: ${{ secrets.LICENCE_FROM_NAME }}
+        run: python3 .github/scripts/deliver-licence.py
+
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: licence-key
           path: ${{ runner.temp }}/licence.txt

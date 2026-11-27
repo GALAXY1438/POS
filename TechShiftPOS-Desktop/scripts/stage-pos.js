@@ -63,6 +63,12 @@ fs.cpSync(SOURCE, TARGET, {
     }
 });
 
+const platformDir = path.join(TARGET, 'www', 'pos', 'superadmin');
+if (fs.existsSync(platformDir)) {
+    fs.rmSync(platformDir, { recursive: true, force: true });
+    console.log('[stage] removed super-admin platform files from the client package');
+}
+
 function dirSize(dir) {
     let total = 0;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -1,6 +1,5 @@
 ﻿<?php
 require_once __DIR__ . '/../config.php';
-User::requireLogin();
 User::requireSuperAdmin();
 $page_title = 'System';
 ob_start();

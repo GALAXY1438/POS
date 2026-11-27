@@ -49,6 +49,11 @@ function secureNoteFailure(): void
 function secureAfterLogin(): string
 {
     unset($_SESSION['login_secure_guard']);
+    if (User::isSuperAdmin()) {
+        AuditLog::log('auth.platform_login_required', "Platform account '{$_SESSION['username']}' was rejected at store passwordless sign-in.");
+        User::clearSession();
+        return SITE_URL . '/superadmin/signin.php?role_error=1';
+    }
     try {
         $tfa = TwoFactor::startForCurrentUser();
         if ($tfa['started']) {

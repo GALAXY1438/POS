@@ -41,6 +41,16 @@ define('ROLE_ADMIN',       'admin');
 define('ROLE_STAFF',       'staff');
 define('ROLE_CASHIER',     'cashier');
 
+define('TSPOS_CLIENT_BUILD', getenv('TECHSHIFT_CLIENT') === '1');
+if (TSPOS_CLIENT_BUILD && PHP_SAPI !== 'cli') {
+    $requestPath = str_replace('\\', '/', $_SERVER['PHP_SELF'] ?? '');
+    if (preg_match('#(?:^|/)superadmin(?:/|$)#', $requestPath)) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        exit('Not found');
+    }
+}
+
 // ── PostgreSQL compatibility layer ───────────────────────────────────────────
 require_once __DIR__ . '/classes/SqlTranslator.php';
 require_once __DIR__ . '/classes/PgCompat.php';
@@ -77,7 +87,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // one-time code is confirmed.
 if (PHP_SAPI !== 'cli' && !empty($_SESSION['tfa'])) {
     $tfaPage = basename($_SERVER['PHP_SELF'] ?? '');
-    if (!in_array($tfaPage, ['verify_2fa.php', 'login.php', 'login_secure.php', 'logout.php', 'license.php', 'terms.php', 'accept_terms.php'], true)) {
+    if (!in_array($tfaPage, ['verify_2fa.php', 'login.php', 'signin.php', 'login_secure.php', 'logout.php', 'license.php', 'terms.php', 'accept_terms.php'], true)) {
         header('Location: ' . SITE_URL . '/verify_2fa.php');
         exit();
     }
@@ -88,7 +98,7 @@ if (PHP_SAPI !== 'cli' && !empty($_SESSION['tfa'])) {
 // license.php and terms.php must stay reachable so the customer can activate.
 if (PHP_SAPI !== 'cli' && !defined('TSPOS_SKIP_LICENCE')) {
     $selfPage = basename($_SERVER['PHP_SELF'] ?? '');
-    if (!in_array($selfPage, ['license.php', 'terms.php', 'logout.php', 'licensing.php'], true) && !License::isActive()) {
+    if (!in_array($selfPage, ['license.php', 'terms.php', 'logout.php', 'licensing.php', 'signin.php'], true) && !License::isActive()) {
         header('Location: ' . SITE_URL . '/license.php');
         exit();
     }
@@ -114,7 +124,7 @@ $conn = new MysqliCompat(Database::getInstance()->getConnection());
 // Recorded per installation when the admin accepts the agreement at first login.
 if (PHP_SAPI !== 'cli' && !empty($_SESSION['user_id'])) {
     $selfPage = basename($_SERVER['PHP_SELF'] ?? '');
-    $eulaSkip = ['accept_terms.php', 'terms.php', 'logout.php', 'license.php', 'verify_2fa.php'];
+    $eulaSkip = ['accept_terms.php', 'terms.php', 'logout.php', 'license.php', 'verify_2fa.php', 'signin.php'];
     if (!in_array($selfPage, $eulaSkip, true)) {
         if (($_SESSION['eula_ok'] ?? '') !== Eula::VERSION) {
             if (Eula::isAccepted()) {

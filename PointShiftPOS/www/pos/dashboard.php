@@ -1,6 +1,6 @@
 ﻿<?php
 require_once 'config.php';
-requireLogin();
+User::requireAdmin();
 
 // Redirect based on role
 $userRole = $_SESSION['role'] ?? 'admin';

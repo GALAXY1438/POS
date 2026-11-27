@@ -53,7 +53,7 @@ function startStack() {
         return;
     }
 
-    const env = Object.assign({}, process.env, { TS_NO_BROWSER: '1' });
+    const env = Object.assign({}, process.env, { TS_NO_BROWSER: '1', TECHSHIFT_CLIENT: '1' });
     try {
         const root = dataRoot();
         fs.mkdirSync(root, { recursive: true });

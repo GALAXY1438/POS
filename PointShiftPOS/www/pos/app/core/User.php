@@ -110,7 +110,7 @@ class User
 
     public static function isAdmin(): bool
     {
-        // super_admin also passes admin checks
+        // Role grouping only; requireAdmin() below keeps store and platform panels separate.
         return isset($_SESSION['role'])
             && in_array($_SESSION['role'], [ROLE_SUPER_ADMIN, ROLE_ADMIN], true);
     }
@@ -148,14 +148,17 @@ class User
     public static function requireAdmin(): void
     {
         self::requireLogin();
-        if (!self::isAdmin()) {
+        if (self::isSuperAdmin() || !self::isAdmin()) {
             self::redirectToDashboard();
         }
     }
 
     public static function requireSuperAdmin(): void
     {
-        self::requireLogin();
+        if (!self::isLoggedIn()) {
+            header('Location: ' . SITE_URL . '/superadmin/signin.php');
+            exit();
+        }
         if (!self::isSuperAdmin()) {
             self::redirectToDashboard();
         }
@@ -167,8 +170,9 @@ class User
     public static function redirectToDashboard(): never
     {
         $role = self::currentRole();
+        $clientBuild = defined('TSPOS_CLIENT_BUILD') && TSPOS_CLIENT_BUILD;
         $map  = [
-            ROLE_SUPER_ADMIN => SITE_URL . '/superadmin/dashboard.php',
+            ROLE_SUPER_ADMIN => $clientBuild ? SITE_URL . '/login.php' : SITE_URL . '/superadmin/dashboard.php',
             ROLE_ADMIN       => SITE_URL . '/admin/dashboard.php',
             ROLE_STAFF       => SITE_URL . '/staff/dashboard.php',
             ROLE_CASHIER     => SITE_URL . '/cashier/pos.php',  // Cashiers start at POS
@@ -178,12 +182,22 @@ class User
         exit();
     }
 
+    public static function clearSession(): void
+    {
+        $_SESSION = [];
+        session_regenerate_id(true);
+    }
+
     public static function logout(): never
     {
         if (!empty($_SESSION['user_id'])) {
             AuditLog::log('auth.logout', "Signed out '" . ($_SESSION['username'] ?? '') . "'.");
         }
-        $_SESSION = [];
+        $clientBuild = defined('TSPOS_CLIENT_BUILD') && TSPOS_CLIENT_BUILD;
+        $target = self::isSuperAdmin() && !$clientBuild
+            ? SITE_URL . '/superadmin/signin.php'
+            : SITE_URL . '/login.php';
+        self::clearSession();
         if (ini_get('session.use_cookies')) {
             $p = session_get_cookie_params();
             setcookie(
@@ -192,7 +206,7 @@ class User
             );
         }
         session_destroy();
-        header('Location: ' . SITE_URL . '/login.php');
+        header('Location: ' . $target);
         exit();
     }
 

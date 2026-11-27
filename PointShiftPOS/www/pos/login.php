@@ -34,6 +34,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['password'] ?? ''
     );
     if ($result['success']) {
+        if (User::isSuperAdmin()) {
+            AuditLog::log('auth.platform_login_required', "Platform account '{$_SESSION['username']}' was rejected at store sign-in.");
+            User::clearSession();
+            header('Location: ' . SITE_URL . '/superadmin/signin.php?role_error=1');
+            exit();
+        }
         // Two-factor: send a code and hold the user on the verification page.
         $tfa = TwoFactor::startForCurrentUser();
         if ($tfa['started']) {
