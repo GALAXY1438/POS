@@ -28,10 +28,21 @@ machine-ids.txt               Machine IDs seen so far.
 
 ISSUING A KEY
 -------------
-Two ways to issue a key. Both use the same private key and write the same
-records under issued\, so they can be used interchangeably.
+Three ways to issue a key. All use the same private key and produce the same
+key format.
 
-GUI (easiest)
+GitHub Actions (from any device)
+  The private repo contains .github/workflows/issue-licence.yml.
+  1. Add a repository secret named LICENCE_PRIVATE_KEY containing the full
+     text of signing\license_private.pem (Settings → Secrets and variables →
+     Actions). It is encrypted by GitHub and never printed in logs.
+  2. Open Actions → "Issue licence" → Run workflow, fill in the customer,
+     machine ID and subscription length (or choose perpetual).
+  3. The signed key appears in the run summary and as a downloadable
+     "licence-key" artifact. Save that record under issued\<Customer>\.
+  Workflows can only be started by people with write access to this repo.
+
+GUI (easiest on the office PC)
   Double-click gui\Start Licence Manager.bat and open http://127.0.0.1:8799/
   if the browser does not open by itself. The first run asks you to set a PIN
   (stored hashed in gui-data\pin.txt). Fill in:
@@ -81,8 +92,9 @@ every client's key. Keep this folder out of any public repository.
 
 IMPORTANT
 ---------
-- Machine IDs are recomputed from live hardware on every licence check, so a
-  copied pos-data folder cannot reuse a key on another PC.
+- Machine IDs are derived from live hardware. The OS lookup is cached per
+  Windows user (LOCALAPPDATA\TechShift), never inside the pos-data folder, so
+  copying that folder to another PC cannot reuse a key there.
 - Renaming a computer or changing its hardware changes the Machine ID; the
   customer must request a new key if that happens.
 - Keep this repository private.

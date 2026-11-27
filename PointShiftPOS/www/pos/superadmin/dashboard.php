@@ -33,6 +33,31 @@ ob_start();
     </span>
 </div>
 
+<!-- Licence strip -->
+<?php
+$lic       = License::status();
+$licActive = !empty($lic['active']);
+$licPlan   = License::typeLabel($lic['payload'] ?? null);
+$licExpiry = License::expiryLabel($lic['payload'] ?? null);
+?>
+<div class="mb-4" style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:38px;height:38px;border-radius:var(--radius);background:var(--bg-surface-2);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">
+            <i class="fas fa-key"></i>
+        </div>
+        <div>
+            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-secondary);">This installation</div>
+            <div style="font-size:.9rem;font-weight:600;">
+                <?php echo $licActive ? htmlspecialchars($licPlan) : 'Not activated'; ?>
+                <span style="font-weight:400;color:var(--text-secondary);"><?php echo $licActive ? ' · expires ' . htmlspecialchars($licExpiry) : ''; ?></span>
+            </div>
+        </div>
+    </div>
+    <a href="licensing.php" class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:4px 12px;">
+        Licences &amp; activations
+    </a>
+</div>
+
 <!-- Platform stats -->
 <div class="row g-3 mb-4">
 <?php

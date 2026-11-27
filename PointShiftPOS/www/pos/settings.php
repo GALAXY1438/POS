@@ -502,7 +502,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'api_key'   => $_POST['sms_api_key']   ?? '',
             'sender_id' => $_POST['sms_sender_id'] ?? '',
         ];
-        $result  = Sms::getBalance($balCfg);
+        $result  = Sms::getBalance($balCfg, 10, true);
         $message = $result['success'] ? 'SMS credit balance: <strong>' . htmlspecialchars($result['balance']) . '</strong> credits.' : 'Balance check failed: ' . htmlspecialchars($result['message']);
         $message_type = $result['success'] ? 'success' : 'danger';
         settingsAjaxReply($message, $message_type);
@@ -632,9 +632,11 @@ $active_tab = $_GET['tab'] ?? 'company';
 $backupFiles = [];
 try { $backupFiles = BackupManager::listBackups(); } catch (Throwable $e) {}
 
-// Installed Windows printers for the receipt printer selector
+// Installed Windows printers for the receipt printer selector (company tab only)
 $printerList = [];
-try { $printerList = ReceiptPrinter::listPrinters(); } catch (Throwable $e) {}
+if ($active_tab === 'company') {
+    try { $printerList = ReceiptPrinter::listPrinters(); } catch (Throwable $e) {}
+}
 
 ob_start();
 ?>

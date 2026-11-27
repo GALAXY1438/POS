@@ -1,0 +1,85 @@
+name: Issue licence
+
+# Signs a customer licence key for a given machine ID.
+# Requires the repository secret LICENCE_PRIVATE_KEY = contents of
+# keystore/signing/license_private.pem. Run from Actions → Issue licence.
+on:
+  workflow_dispatch:
+    inputs:
+      customer:
+        description: Customer / shop name
+        required: true
+      machine:
+        description: Machine ID from the client's activation screen (XXXX-XXXX-XXXX-XXXX)
+        required: true
+      type:
+        description: Licence type
+        type: choice
+        options: [subscription, perpetual]
+        default: subscription
+      days:
+        description: Subscription length in days (ignored for perpetual or when exp is set)
+        default: "30"
+      exp:
+        description: Explicit expiry YYYY-MM-DD (optional)
+        default: ""
+      key_id:
+        description: Key ID (optional, e.g. TS-2026-001)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: openssl
+
+      - name: Load signing key
+        env:
+          LICENCE_PRIVATE_KEY: ${{ secrets.LICENCE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$LICENCE_PRIVATE_KEY" ]; then
+            echo "::error::Add the LICENCE_PRIVATE_KEY repository secret (contents of keystore/signing/license_private.pem)."
+            exit 1
+          fi
+          printf '%s\n' "$LICENCE_PRIVATE_KEY" > "$RUNNER_TEMP/license_private.pem"
+          chmod 600 "$RUNNER_TEMP/license_private.pem"
+
+      - name: Sign licence
+        env:
+          CUSTOMER: ${{ inputs.customer }}
+          MACHINE: ${{ inputs.machine }}
+          TYPE: ${{ inputs.type }}
+          DAYS: ${{ inputs.days }}
+          EXP: ${{ inputs.exp }}
+          KEY_ID: ${{ inputs.key_id }}
+        run: |
+          args=(issue --type="$TYPE" --name="$CUSTOMER" --machine="$MACHINE"
+                --key="$RUNNER_TEMP/license_private.pem" --out="$RUNNER_TEMP/licence.txt")
+          if [ "$TYPE" = "subscription" ]; then
+            if [ -n "$EXP" ]; then args+=(--exp="$EXP"); else args+=(--days="${DAYS:-30}"); fi
+          fi
+          if [ -n "$KEY_ID" ]; then args+=(--id="$KEY_ID"); fi
+          php keystore/tools/licence.php "${args[@]}"
+          {
+            echo "### Licence issued"
+            echo ""
+            echo '```'
+            cat "$RUNNER_TEMP/licence.txt"
+            echo '```'
+            echo ""
+            echo "Save this record under keystore/issued/<Customer>/ so it can be re-sent later."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: licence-key
+          path: ${{ runner.temp }}/licence.txt
+          if-no-files-found: error

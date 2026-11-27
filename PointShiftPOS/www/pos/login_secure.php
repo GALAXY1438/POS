@@ -58,7 +58,7 @@ function secureAfterLogin(): string
     } catch (Throwable $e) {
         // 2FA must never block a completed sign-in
     }
-    return SITE_URL . '/splash.php';
+    return SITE_URL . '/splash_redirect.php';
 }
 
 if (isLoggedIn()) {

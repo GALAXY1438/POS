@@ -41,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: verify_2fa.php');
             exit();
         }
-        // After successful login, show splash before dashboard
-        header('Location: splash.php');
+        // Straight to the correct dashboard — no artificial loading screen.
+        header('Location: splash_redirect.php');
         exit();
     } elseif (isset($result['needs_verification']) && $result['needs_verification']) {
         // Redirect to email verification

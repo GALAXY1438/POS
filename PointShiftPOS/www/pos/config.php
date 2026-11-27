@@ -88,7 +88,7 @@ if (PHP_SAPI !== 'cli' && !empty($_SESSION['tfa'])) {
 // license.php and terms.php must stay reachable so the customer can activate.
 if (PHP_SAPI !== 'cli' && !defined('TSPOS_SKIP_LICENCE')) {
     $selfPage = basename($_SERVER['PHP_SELF'] ?? '');
-    if (!in_array($selfPage, ['license.php', 'terms.php', 'logout.php'], true) && !License::isActive()) {
+    if (!in_array($selfPage, ['license.php', 'terms.php', 'logout.php', 'licensing.php'], true) && !License::isActive()) {
         header('Location: ' . SITE_URL . '/license.php');
         exit();
     }

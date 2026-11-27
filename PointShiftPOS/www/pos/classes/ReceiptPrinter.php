@@ -199,10 +199,27 @@ class ReceiptPrinter
     }
 
     /** Installed printers: [['name'=>..., 'default'=>bool], ...] */
-    public static function listPrinters(): array
+    public static function listPrinters(bool $force = false): array
     {
         static $cache = null;
         if ($cache !== null) return $cache;
+
+        // The PowerShell query takes over a second; cache it on disk so only
+        // the first settings load (or a forced refresh) pays that cost.
+        $dataRoot  = getenv('TECHSHIFT_DATA_ROOT');
+        $cacheBase = is_string($dataRoot) && trim($dataRoot) !== ''
+            ? rtrim($dataRoot, "\\/")
+            : dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'data';
+        $cacheFile = $cacheBase . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'printers.json';
+        if (!$force) {
+            $raw = @file_get_contents($cacheFile);
+            if (is_string($raw) && $raw !== '') {
+                $saved = json_decode($raw, true);
+                if (is_array($saved) && (time() - (int)($saved['at'] ?? 0)) < 600 && isset($saved['printers']) && is_array($saved['printers'])) {
+                    return $cache = $saved['printers'];
+                }
+            }
+        }
 
         $root   = dirname(__DIR__, 3);
         $script = $root . DIRECTORY_SEPARATOR . 'runtime' . DIRECTORY_SEPARATOR . 'print' . DIRECTORY_SEPARATOR . 'listprinters.ps1';
@@ -220,6 +237,13 @@ class ReceiptPrinter
                 $cache[] = ['name' => $parts[0], 'default' => $parts[1] === '1'];
             }
         }
+
+        $dir = dirname($cacheFile);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        @file_put_contents($cacheFile, json_encode(['at' => time(), 'printers' => $cache], JSON_PRETTY_PRINT), LOCK_EX);
+
         return $cache;
     }
 

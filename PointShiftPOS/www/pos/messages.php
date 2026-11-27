@@ -9,7 +9,7 @@ $user_id    = $_SESSION['user_id'];
 /* ── AJAX: SMS balance check ─────────────────────────────── */
 if (isset($_GET['check_sms_balance'])) {
     header('Content-Type: application/json');
-    $bal = Sms::getBalance();
+    $bal = Sms::getBalance(null, 10);
     echo json_encode($bal);
     exit;
 }

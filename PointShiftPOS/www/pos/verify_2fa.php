@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $res = TwoFactor::verify((string)($_POST['code'] ?? ''));
         if ($res['success']) {
-            header('Location: splash.php');
+            header('Location: splash_redirect.php');
             exit();
         }
         $error = $res['message'];

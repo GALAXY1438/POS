@@ -111,9 +111,14 @@ class Sms
 
     /**
      * Query remaining SMS balance.
+     *
+     * Successful checks are cached on disk for a few minutes so pages that
+     * display the balance never wait on the provider. Pass $force = true for
+     * an explicit "check balance" action.
+     *
      * @return array ['success'=>bool, 'balance'=>string|null, 'message'=>string]
      */
-    public static function getBalance(?array $cfg = null): array
+    public static function getBalance(?array $cfg = null, int $timeout = 10, bool $force = false): array
     {
         $c = $cfg ?? self::cfg();
 
@@ -121,24 +126,94 @@ class Sms
             return ['success' => false, 'balance' => null, 'message' => 'No API key configured.'];
         }
 
+        $fingerprint = sha1((string)$c['api_key']);
+        $cache       = self::readBalanceCache();
+        if (!$force && is_array($cache) && ($cache['fp'] ?? '') === $fingerprint) {
+            $age = time() - (int)($cache['at'] ?? 0);
+            if (!empty($cache['ok']) && $age < 300) {
+                return ['success' => true, 'balance' => (string)$cache['balance'], 'message' => 'Cached', 'at' => (int)$cache['at']];
+            }
+            if (empty($cache['ok']) && $age < 60) {
+                return ['success' => false, 'balance' => null, 'message' => (string)($cache['message'] ?? 'Balance unavailable.')];
+            }
+        }
+
         $response = self::curlPost(self::BLESSEDTEXTS_BALANCE, [
             'api_key' => $c['api_key'],
-        ]);
+        ], $timeout);
 
         if (!$response['ok']) {
+            self::writeBalanceCache(['fp' => $fingerprint, 'at' => time(), 'ok' => false, 'balance' => null, 'message' => $response['error']]);
             return ['success' => false, 'balance' => null, 'message' => $response['error']];
         }
 
         $data = $response['data'];
         if (isset($data['status_code']) && $data['status_code'] === '1000') {
-            return ['success' => true, 'balance' => $data['balance'] ?? '0', 'message' => 'OK'];
+            $balance = (string)($data['balance'] ?? '0');
+            self::writeBalanceCache(['fp' => $fingerprint, 'at' => time(), 'ok' => true, 'balance' => $balance, 'message' => 'OK']);
+            return ['success' => true, 'balance' => $balance, 'message' => 'OK'];
         }
 
+        $message = self::describeStatusCode($data['status_code'] ?? '');
+        self::writeBalanceCache(['fp' => $fingerprint, 'at' => time(), 'ok' => false, 'balance' => null, 'message' => $message]);
         return [
             'success' => false,
             'balance' => null,
-            'message' => self::describeStatusCode($data['status_code'] ?? ''),
+            'message' => $message,
         ];
+    }
+
+    /**
+     * Last saved balance without touching the network. Dashboards use this so
+     * a slow SMS provider can never delay first paint.
+     */
+    public static function cachedBalance(?array $cfg = null, int $maxAge = 0): array
+    {
+        $c = $cfg ?? self::cfg();
+        if (empty($c['api_key'])) {
+            return ['success' => false, 'balance' => null, 'message' => 'No API key configured.'];
+        }
+
+        $cache = self::readBalanceCache();
+        if (!is_array($cache) || ($cache['fp'] ?? '') !== sha1((string)$c['api_key'])) {
+            return ['success' => false, 'balance' => null, 'message' => 'Not checked yet — open Messages to refresh.'];
+        }
+        if ($maxAge > 0 && time() - (int)($cache['at'] ?? 0) > $maxAge) {
+            return ['success' => false, 'balance' => null, 'message' => 'Not checked recently — open Messages to refresh.'];
+        }
+        if (empty($cache['ok'])) {
+            return ['success' => false, 'balance' => null, 'message' => (string)($cache['message'] ?? 'Balance unavailable.')];
+        }
+        return ['success' => true, 'balance' => (string)$cache['balance'], 'message' => 'Cached', 'at' => (int)$cache['at']];
+    }
+
+    private static function balanceCacheFile(): string
+    {
+        $root = getenv('TECHSHIFT_DATA_ROOT');
+        $base = is_string($root) && trim($root) !== ''
+            ? rtrim($root, "\\/")
+            : dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'data';
+        return $base . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'sms_balance.json';
+    }
+
+    private static function readBalanceCache(): ?array
+    {
+        $raw = @file_get_contents(self::balanceCacheFile());
+        if ($raw === false || $raw === '') {
+            return null;
+        }
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : null;
+    }
+
+    private static function writeBalanceCache(array $entry): void
+    {
+        $file = self::balanceCacheFile();
+        $dir  = dirname($file);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        @file_put_contents($file, json_encode($entry, JSON_PRETTY_PRINT), LOCK_EX);
     }
 
     // ── BlessedTexts internals ────────────────────────────────────────────
@@ -316,5 +391,6 @@ class Sms
     public static function resetCache(): void
     {
         self::$cfg = null;
+        @unlink(self::balanceCacheFile());
     }
 }

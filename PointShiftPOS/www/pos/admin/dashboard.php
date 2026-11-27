@@ -182,11 +182,11 @@ $trendOrders  = array_map(fn($r) => (int)$r['orders'],   $trendData);
 $trendTotal   = array_sum($trendSales);
 $trendOrderCt = array_sum($trendOrders);
 
-// SMS balance (BlessedTexts)
+// SMS balance (BlessedTexts) — cached copy only, never blocks the page
 $smsBalance     = null;
 $smsBalanceError = null;
 try {
-    $smsBal = Sms::getBalance();
+    $smsBal = Sms::cachedBalance();
     if ($smsBal['success']) {
         $smsBalance = $smsBal['balance'];
     } else {
@@ -520,15 +520,15 @@ body.figures-hidden .kpi-card::after {
             <i class="fas fa-eye-slash" id="privacyIcon"></i>
             <span id="privacyLabel">Hide amounts</span>
         </button>
-        <div class="dash-sms-bal" title="SMS credit balance">
+        <div class="dash-sms-bal" id="dashSmsBal" title="SMS credit balance">
             <i class="fas fa-comment-sms"></i>
             <span class="dash-sms-label">SMS balance:</span>
             <?php if ($smsBalance !== null): ?>
-                <span class="dash-sms-value" data-sensitive><?php echo number_format((float)$smsBalance); ?></span>
+                <span class="dash-sms-value" id="dashSmsValue" data-sensitive><?php echo number_format((float)$smsBalance); ?></span>
             <?php elseif ($smsBalanceError): ?>
-                <span class="dash-sms-value dash-sms-err" title="<?php echo htmlspecialchars($smsBalanceError); ?>">—</span>
+                <span class="dash-sms-value dash-sms-err" id="dashSmsValue" title="<?php echo htmlspecialchars($smsBalanceError); ?>">—</span>
             <?php else: ?>
-                <span class="dash-sms-value">…</span>
+                <span class="dash-sms-value" id="dashSmsValue">…</span>
             <?php endif; ?>
         </div>
         <div class="dash-date"><?php echo date('D, d M Y'); ?></div>
@@ -1398,6 +1398,24 @@ function toggleSection(cardId, collapsedClass, iconId, lblId) {
             }
         }
     });
+})();
+</script>
+<script>
+// Fill the SMS balance after paint so a slow provider never delays the page.
+(function () {
+    var valueEl = document.getElementById('dashSmsValue');
+    if (!valueEl) return;
+    fetch('/pos/messages.php?check_sms_balance=1', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (b) {
+            if (!b || !b.success || b.balance === null || b.balance === undefined) return;
+            var n = Number(b.balance);
+            valueEl.textContent = isNaN(n) ? b.balance : n.toLocaleString();
+            valueEl.classList.remove('dash-sms-err');
+            var pill = document.getElementById('dashSmsBal');
+            if (pill) pill.title = 'SMS credit balance (updated ' + new Date().toLocaleTimeString() + ')';
+        })
+        .catch(function () {});
 })();
 </script>
 

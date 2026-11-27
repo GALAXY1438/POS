@@ -45,6 +45,9 @@ $_self        = basename($_SERVER['PHP_SELF']);
             <li><a class="nav-link <?php echo $_self==='tenants.php'?'active':''; ?>" href="tenants.php">
                 <i class="fas fa-building"></i> Tenants
             </a></li>
+            <li><a class="nav-link <?php echo $_self==='licensing.php'?'active':''; ?>" href="licensing.php">
+                <i class="fas fa-key"></i> Licences
+            </a></li>
             <li><a class="nav-link <?php echo $_self==='users.php'?'active':''; ?>" href="users.php">
                 <i class="fas fa-id-badge"></i> All Users
             </a></li>

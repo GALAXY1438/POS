@@ -41,6 +41,20 @@ class License
         return self::dataDir() . DIRECTORY_SEPARATOR . 'machine.id';
     }
 
+    /**
+     * Live-ID cache. Stored per Windows user (LOCALAPPDATA), never inside the
+     * pos-data folder, so copying the installation to another PC does not
+     * carry a matching identity with it.
+     */
+    private static function machineCacheFile(): string
+    {
+        $local = getenv('LOCALAPPDATA');
+        if (is_string($local) && trim($local) !== '') {
+            return rtrim($local, "\\/") . DIRECTORY_SEPARATOR . 'TechShift' . DIRECTORY_SEPARATOR . 'machine-cache.json';
+        }
+        return self::dataDir() . DIRECTORY_SEPARATOR . 'machine-cache.json';
+    }
+
     private static function ensureDir(): void
     {
         $dir = self::dataDir();
@@ -52,10 +66,12 @@ class License
     /**
      * Per-machine identifier shown to the customer for activation.
      *
-     * Always derived from the live hardware in this request. The machine.id
-     * file is only a display/diagnostic cache and is refreshed when it no
-     * longer matches; it is never trusted for licence validation, so copying
-     * the data folder to another PC cannot carry a matching identity.
+     * Derived from live hardware, with the OS query result cached on this
+     * machine only (LOCALAPPDATA) so ordinary page loads stay fast. The cache
+     * is bound to the computer name and refreshed monthly; it never lives in
+     * the pos-data folder, so copying that folder to another PC cannot carry
+     * a matching identity. The machine.id file is display/diagnostic only and
+     * is never trusted for licence validation.
      */
     public static function machineId(): string
     {
@@ -63,30 +79,70 @@ class License
             return self::$liveMachineId;
         }
 
+        $pc = (string)(getenv('COMPUTERNAME') ?: gethostname());
+
+        $cacheFile = self::machineCacheFile();
+        $cachedRaw = @file_get_contents($cacheFile);
+        if (is_string($cachedRaw) && $cachedRaw !== '') {
+            $cached = json_decode($cachedRaw, true);
+            if (is_array($cached)
+                && ($cached['pc'] ?? '') === $pc
+                && (time() - (int)($cached['at'] ?? 0)) < 2592000
+                && preg_match('/^[0-9A-F]{4}(-[0-9A-F]{4}){3}$/', (string)($cached['id'] ?? '')) === 1
+            ) {
+                $id = (string)$cached['id'];
+                self::rememberDisplayId($id);
+                return self::$liveMachineId = $id;
+            }
+        }
+
         $uuid = '';
         if (stripos(PHP_OS, 'WIN') === 0 && function_exists('shell_exec')) {
-            $uuid = trim((string)@shell_exec(
-                'powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystemProduct).UUID"'
-            ));
+            // wmic answers the same BIOS UUID as the CIM query below but starts faster.
+            $out = (string)@shell_exec('wmic csproduct get uuid 2>NUL');
+            if (preg_match('/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/', $out, $m) === 1) {
+                $uuid = strtoupper($m[1]);
+            }
+            if ($uuid === '') {
+                $uuid = trim((string)@shell_exec(
+                    'powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystemProduct).UUID"'
+                ));
+            }
             if (preg_match('/^[0-9a-fA-F-]{20,}$/', $uuid) !== 1) {
                 $uuid = '';
             }
         }
         if ($uuid === '') {
-            $uuid = (string)(getenv('COMPUTERNAME') ?: gethostname());
+            $uuid = $pc;
         }
 
-        $raw  = strtolower($uuid . '|' . (string)(getenv('COMPUTERNAME') ?: gethostname()));
+        $raw  = strtolower($uuid . '|' . $pc);
         $hash = strtoupper(substr(hash('sha256', $raw), 0, 16));
         $id   = implode('-', str_split($hash, 4));
 
+        self::rememberDisplayId($id);
+
+        $dir = dirname($cacheFile);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        @file_put_contents($cacheFile, json_encode([
+            'id'   => $id,
+            'uuid' => $uuid,
+            'pc'   => $pc,
+            'at'   => time(),
+        ], JSON_PRETTY_PRINT), LOCK_EX);
+
+        return self::$liveMachineId = $id;
+    }
+
+    private static function rememberDisplayId(string $id): void
+    {
         $cached = @file_get_contents(self::machineFile());
         if (!is_string($cached) || trim($cached) !== $id) {
             self::ensureDir();
             @file_put_contents(self::machineFile(), $id);
         }
-
-        return self::$liveMachineId = $id;
     }
 
     private static function publicKey(): ?string
@@ -186,8 +242,51 @@ class License
             return ['ok' => false, 'error' => 'Could not save the licence on this PC. Check folder permissions.'];
         }
 
+        self::appendHistory($payload);
+
         self::$statusCache = null;
         return ['ok' => true, 'payload' => $payload];
+    }
+
+    /** Activations kept on this installation, newest first (shown in Super Admin → Licences). */
+    private static function appendHistory(array $payload): void
+    {
+        $file = self::dataDir() . DIRECTORY_SEPARATOR . 'license-history.json';
+        $rows = [];
+        $raw  = @file_get_contents($file);
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $rows = $decoded;
+            }
+        }
+
+        array_unshift($rows, [
+            'key_id'     => (string)($payload['id'] ?? ''),
+            'customer'   => (string)($payload['c'] ?? ''),
+            'type'       => (string)($payload['t'] ?? ''),
+            'expires'    => (string)($payload['exp'] ?? ''),
+            'issued'     => (string)($payload['i'] ?? ''),
+            'machine'    => (string)($payload['m'] ?? ''),
+            'activated'  => date('c'),
+        ]);
+
+        @file_put_contents(
+            $file,
+            json_encode(array_slice($rows, 0, 100), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            LOCK_EX
+        );
+    }
+
+    /** @return array<int,array<string,string>> */
+    public static function history(): array
+    {
+        $raw = @file_get_contents(self::dataDir() . DIRECTORY_SEPARATOR . 'license-history.json');
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
     }
 
     private static function storedKey(): ?string
