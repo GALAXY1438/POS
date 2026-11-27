@@ -1,5 +1,4 @@
 ﻿<?php
 require_once __DIR__ . '/../config.php';
 User::requireSuperAdmin();
-header('Location: /pos/activity_logs.php');
-exit();
+require_once __DIR__ . '/../activity_logs.php';

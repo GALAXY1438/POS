@@ -3,6 +3,7 @@ import json
 import os
 import re
 import smtplib
+import ssl
 import sys
 from email.message import EmailMessage
 from pathlib import Path
@@ -59,7 +60,7 @@ def send_sms(phone, customer, machine, key):
     request = Request(
         "https://sms.blessedtexts.com/api/sms/v1/sendsms",
         data=payload,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TechShift-POS-Licence-Delivery/1.0"},
         method="POST",
     )
     with urlopen(request, timeout=20) as response:
@@ -108,12 +109,12 @@ def send_email(address, customer, record):
     )
 
     if security == "ssl":
-        server = smtplib.SMTP_SSL(host, port, timeout=20)
+        server = smtplib.SMTP_SSL(host, port, timeout=20, context=ssl.create_default_context())
     else:
         server = smtplib.SMTP(host, port, timeout=20)
-        if security == "tls":
-            server.starttls()
     try:
+        if security == "tls":
+            server.starttls(context=ssl.create_default_context())
         server.login(username, password)
         server.send_message(message)
     finally:

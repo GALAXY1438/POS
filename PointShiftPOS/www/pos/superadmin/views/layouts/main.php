@@ -54,7 +54,7 @@ $_self        = basename($_SERVER['PHP_SELF']);
             <li><a class="nav-link <?php echo $_self==='system.php'?'active':''; ?>" href="system.php">
                 <i class="fas fa-hard-drive"></i> System
             </a></li>
-            <li><a class="nav-link <?php echo $_self==='logs.php'?'active':''; ?>" href="logs.php">
+            <li><a class="nav-link <?php echo in_array($_self, ['logs.php', 'activity_logs.php'], true) ? 'active' : ''; ?>" href="logs.php">
                 <i class="fas fa-list-check"></i> Audit Logs
             </a></li>
         </ul>

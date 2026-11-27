@@ -5,142 +5,161 @@ User::requireSuperAdmin();
 $page_title = 'Super Admin Dashboard';
 $db         = Database::getInstance()->getConnection();
 
-// Platform-wide stats
 $totalUsers    = $db->query("SELECT COUNT(*) FROM users WHERE status='active'")->fetchColumn();
 $totalOrders   = $db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 $totalRevenue  = $db->query("SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE status='completed'")->fetchColumn();
 $totalProducts = $db->query("SELECT COUNT(*) FROM products WHERE status='active'")->fetchColumn();
-
-// Users by role
-$roleStats = $db->query("SELECT role, COUNT(*) cnt FROM users GROUP BY role")->fetchAll();
-
-// Recent users
-$recentUsers = $db->query("SELECT id, username, role, first_name, last_name, status, created_at FROM users ORDER BY created_at DESC LIMIT 10")->fetchAll();
+$roleStats     = $db->query("SELECT role, COUNT(*) cnt FROM users GROUP BY role ORDER BY cnt DESC, role")->fetchAll();
+$recentUsers   = $db->query("SELECT id, username, role, first_name, last_name, status, created_at FROM users ORDER BY created_at DESC LIMIT 10")->fetchAll();
 
 ob_start();
 ?>
-<!-- Heading -->
-<div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h5 style="font-weight:700;font-size:1.15rem;margin:0 0 3px;">Super Admin Dashboard</h5>
-        <p style="margin:0;font-size:.82rem;color:var(--text-secondary);">
-            Platform overview — Welcome, <strong><?php echo htmlspecialchars($_SESSION['first_name'] ?? 'Super Admin'); ?></strong>
-        </p>
+<style>
+.dash-header{margin-bottom:20px}
+.dash-header-left h5{font-size:1.5rem;font-weight:600;line-height:1.25;color:var(--text-primary);margin:0}
+.dash-header-left p{font-size:.875rem;color:var(--text-secondary);margin:4px 0 0}
+.dash-date{font-size:.72rem;color:var(--text-secondary);font-weight:500;white-space:nowrap;padding-top:4px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.kpi-card{background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:12px 14px;position:relative;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.kpi-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--text-primary);opacity:.06}
+.kpi-label{font-size:.6875rem;font-weight:500;letter-spacing:.2px;color:var(--text-secondary);margin-bottom:4px}
+.kpi-value{font-size:1.125rem;font-weight:600;color:var(--text-primary);letter-spacing:-.3px;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi-sub{font-size:.7rem;color:var(--text-muted);margin-top:3px}
+.sc{background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden;height:100%}
+.sc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border-color);font-size:.8rem;font-weight:600;color:var(--text-primary)}
+.sc-head-left{display:flex;align-items:center;gap:8px}
+.sc-icon{width:26px;height:26px;border-radius:6px;background:var(--bg-surface-2);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--text-secondary);flex-shrink:0}
+.sc-body{padding:14px 16px}
+.sc-link{font-size:.72rem;color:var(--text-secondary);text-decoration:none;font-weight:500;transition:color .12s}
+.sc-link:hover{color:var(--text-primary)}
+.sa-licence{background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.sa-licence-main{display:flex;align-items:center;gap:12px;min-width:0}
+.sa-licence-copy{min-width:0}
+.sa-licence-label{font-size:.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text-secondary);margin-bottom:3px}
+.sa-licence-value{font-size:.86rem;font-weight:600;color:var(--text-primary)}
+.sa-licence-value span{font-weight:400;color:var(--text-secondary)}
+.sa-role-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light)}
+.sa-role-row:last-child{border-bottom:none}
+.sa-role-name{display:flex;align-items:center;gap:9px;font-size:.8rem;font-weight:500;color:var(--text-primary);text-transform:capitalize}
+.sa-role-dot{width:7px;height:7px;border-radius:50%;background:var(--text-secondary);opacity:.55;flex-shrink:0}
+.sa-role-count{min-width:28px;text-align:center;font-size:.7rem;font-weight:600;color:var(--text-secondary);background:var(--bg-surface-2);border:1px solid var(--border-color);border-radius:99px;padding:2px 8px}
+.sa-users-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.sa-users-table th{text-align:left;font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);padding:9px 12px;border-bottom:1px solid var(--border-color);background:var(--bg-surface-2);white-space:nowrap}
+.sa-users-table td{padding:9px 12px;border-bottom:1px solid var(--border-light);vertical-align:middle;color:var(--text-primary)}
+.sa-users-table tr:last-child td{border-bottom:none}
+.sa-users-table tbody tr:hover td{background:var(--bg-surface-2)}
+.sa-role-badge{display:inline-flex;align-items:center;font-size:.62rem;font-weight:600;color:var(--text-secondary);background:var(--bg-surface-2);border:1px solid var(--border-color);border-radius:99px;padding:2px 8px;text-transform:capitalize;white-space:nowrap}
+.sa-status{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;color:var(--text-secondary);white-space:nowrap}
+.sa-status::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--text-secondary);opacity:.45}
+.sa-status.active::before{opacity:.9}
+.sa-note{display:flex;align-items:flex-start;gap:12px}
+.sa-note-icon{width:34px;height:34px;border-radius:var(--radius);background:var(--bg-surface-2);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);flex-shrink:0}
+.sa-note h6{font-size:.8rem;font-weight:600;margin:0 0 3px;color:var(--text-primary)}
+.sa-note p{font-size:.75rem;color:var(--text-secondary);margin:0;line-height:1.5}
+@media(max-width:991px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:575px){.kpi-grid{gap:8px}.kpi-value{font-size:1.05rem}.sa-users-table th,.sa-users-table td{padding:8px 9px}}
+</style>
+
+<div class="page-header-bar dash-header">
+    <div class="dash-header-left">
+        <h5>Overview</h5>
+        <p>Platform overview — Welcome, <strong><?php echo htmlspecialchars($_SESSION['first_name'] ?? 'Super Admin'); ?></strong></p>
     </div>
-    <span class="badge bg-danger" style="font-size:.75rem;padding:5px 12px;border-radius:99px;">
-        <?php echo date('D, M j Y'); ?>
-    </span>
+    <span class="dash-date"><?php echo date('D, d M Y'); ?></span>
 </div>
 
-<!-- Licence strip -->
 <?php
 $lic       = License::status();
 $licActive = !empty($lic['active']);
 $licPlan   = License::typeLabel($lic['payload'] ?? null);
 $licExpiry = License::expiryLabel($lic['payload'] ?? null);
+$licState  = !$licActive ? 'Not activated' : (!empty($lic['grace']) ? 'Grace period' : 'Active');
 ?>
-<div class="mb-4" style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:38px;height:38px;border-radius:var(--radius);background:var(--bg-surface-2);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">
-            <i class="fas fa-key"></i>
-        </div>
-        <div>
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-secondary);">This installation</div>
-            <div style="font-size:.9rem;font-weight:600;">
-                <?php echo $licActive ? htmlspecialchars($licPlan) : 'Not activated'; ?>
-                <span style="font-weight:400;color:var(--text-secondary);"><?php echo $licActive ? ' · expires ' . htmlspecialchars($licExpiry) : ''; ?></span>
+<div class="sa-licence">
+    <div class="sa-licence-main">
+        <div class="sc-icon"><i class="fas fa-key"></i></div>
+        <div class="sa-licence-copy">
+            <div class="sa-licence-label">This installation</div>
+            <div class="sa-licence-value">
+                <?php echo htmlspecialchars($licState); ?>
+                <?php if ($licActive): ?>
+                    <span>· <?php echo htmlspecialchars($licPlan); ?> · expires <?php echo htmlspecialchars($licExpiry); ?></span>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-    <a href="licensing.php" class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:4px 12px;">
-        Licences &amp; activations
-    </a>
+    <a href="licensing.php" class="btn btn-outline-secondary btn-sm">Licences &amp; activations</a>
 </div>
 
-<!-- Platform stats -->
-<div class="row g-3 mb-4">
-<?php
-$sa_metrics = [
-    ['fas fa-users',        '#c62828', $totalUsers,    'Active Users',    'All roles'],
-    ['fas fa-shopping-cart','#1976d2', $totalOrders,   'Total Orders',    'All time'],
-    ['fas fa-coins',        '#2e7d32', formatCurrency($totalRevenue), 'Total Revenue', 'All time'],
-    ['fas fa-boxes',        '#6a1b9a', $totalProducts, 'Active Products', 'In catalog'],
-];
-foreach ($sa_metrics as [$icon, $color, $val, $label, $sub]): ?>
-<div class="col-xl-3 col-md-6">
-    <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:20px 22px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-xs);">
-        <div style="width:50px;height:50px;border-radius:var(--radius);background:<?php echo $color; ?>;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">
-            <i class="<?php echo $icon; ?>"></i>
-        </div>
-        <div>
-            <div style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);"><?php echo $label; ?></div>
-            <div style="font-size:1.4rem;font-weight:700;"><?php echo $val; ?></div>
-            <div style="font-size:.72rem;color:var(--primary);"><?php echo $sub; ?></div>
-        </div>
+<div class="kpi-grid">
+    <?php
+    $metrics = [
+        [$totalUsers, 'Active users', 'All roles'],
+        [$totalOrders, 'Total orders', 'All time'],
+        [formatCurrency($totalRevenue), 'Total revenue', 'Completed orders'],
+        [$totalProducts, 'Active products', 'In catalog'],
+    ];
+    foreach ($metrics as [$value, $label, $sub]): ?>
+    <div class="kpi-card">
+        <div class="kpi-label"><?php echo htmlspecialchars($label); ?></div>
+        <div class="kpi-value"><?php echo $value; ?></div>
+        <div class="kpi-sub"><?php echo htmlspecialchars($sub); ?></div>
     </div>
-</div>
-<?php endforeach; ?>
+    <?php endforeach; ?>
 </div>
 
-<!-- Role breakdown + Recent users -->
 <div class="row g-3">
-    <!-- Role breakdown -->
     <div class="col-xl-4">
-        <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-xs);">
-            <div style="padding:14px 18px;border-bottom:1px solid var(--border-color);font-weight:700;font-size:.85rem;">
-                <i class="fas fa-users-cog me-2" style="color:var(--primary);"></i>Users by Role
-            </div>
-            <div style="padding:16px 18px;">
-                <?php
-                $roleColors = [
-                    'super_admin' => '#c62828',
-                    'admin'       => '#1976d2',
-                    'staff'       => '#2e7d32',
-                    'cashier'     => '#f57c00',
-                ];
-                foreach ($roleStats as $r):
-                    $color = $roleColors[$r['role']] ?? '#637381';
-                ?>
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border-color);margin-bottom:8px;background:var(--bg-body);">
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <div style="width:10px;height:10px;border-radius:50%;background:<?php echo $color; ?>;"></div>
-                        <span style="font-size:.875rem;font-weight:600;text-transform:capitalize;"><?php echo str_replace('_', ' ', $r['role']); ?></span>
-                    </div>
-                    <span class="badge" style="background:<?php echo $color; ?>;color:#fff;"><?php echo $r['cnt']; ?></span>
+        <div class="sc">
+            <div class="sc-head">
+                <div class="sc-head-left">
+                    <div class="sc-icon"><i class="fas fa-users-cog"></i></div>
+                    Users by role
                 </div>
-                <?php endforeach; ?>
+                <a href="users.php" class="sc-link">View all</a>
+            </div>
+            <div class="sc-body">
+                <?php if (!$roleStats): ?>
+                    <div style="padding:18px 0;text-align:center;font-size:.78rem;color:var(--text-secondary);">No users found.</div>
+                <?php else: foreach ($roleStats as $role): ?>
+                    <div class="sa-role-row">
+                        <div class="sa-role-name">
+                            <span class="sa-role-dot"></span>
+                            <?php echo htmlspecialchars(str_replace('_', ' ', $role['role'])); ?>
+                        </div>
+                        <span class="sa-role-count"><?php echo number_format((int)$role['cnt']); ?></span>
+                    </div>
+                <?php endforeach; endif; ?>
             </div>
         </div>
     </div>
 
-    <!-- Recent users -->
     <div class="col-xl-8">
-        <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-xs);">
-            <div style="padding:14px 18px;border-bottom:1px solid var(--border-color);font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;">
-                <span><i class="fas fa-user-plus me-2" style="color:var(--primary);"></i>Recent Users</span>
-                <a href="users.php" class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:3px 10px;">View All</a>
+        <div class="sc">
+            <div class="sc-head">
+                <div class="sc-head-left">
+                    <div class="sc-icon"><i class="fas fa-user-plus"></i></div>
+                    Recent users
+                </div>
+                <a href="users.php" class="sc-link">View all</a>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0" style="font-size:.85rem;">
-                    <thead class="table-light">
-                        <tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Joined</th></tr>
+            <div style="overflow-x:auto;">
+                <table class="sa-users-table">
+                    <thead>
+                        <tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Joined</th></tr>
                     </thead>
                     <tbody>
-                    <?php foreach ($recentUsers as $u): ?>
-                    <tr>
-                        <td><?php echo $u['id']; ?></td>
-                        <td><?php echo htmlspecialchars($u['first_name'] . ' ' . $u['last_name']); ?></td>
-                        <td><code><?php echo htmlspecialchars($u['username']); ?></code></td>
-                        <td>
-                            <?php
-                            $rc = $roleColors[$u['role']] ?? '#637381';
-                            echo '<span class="badge" style="background:' . $rc . ';color:#fff;">' . str_replace('_', ' ', ucfirst($u['role'])) . '</span>';
-                            ?>
-                        </td>
-                        <td><span class="badge bg-<?php echo $u['status'] === 'active' ? 'success' : 'secondary'; ?>"><?php echo ucfirst($u['status']); ?></span></td>
-                        <td class="text-muted"><?php echo date('M j, Y', strtotime($u['created_at'])); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
+                    <?php if (!$recentUsers): ?>
+                        <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--text-secondary);">No users found.</td></tr>
+                    <?php else: foreach ($recentUsers as $user): ?>
+                        <tr>
+                            <td style="white-space:nowrap;"><?php echo htmlspecialchars(trim($user['first_name'] . ' ' . $user['last_name'])); ?></td>
+                            <td><code><?php echo htmlspecialchars($user['username']); ?></code></td>
+                            <td><span class="sa-role-badge"><?php echo htmlspecialchars(str_replace('_', ' ', $user['role'])); ?></span></td>
+                            <td><span class="sa-status <?php echo $user['status'] === 'active' ? 'active' : ''; ?>"><?php echo htmlspecialchars(ucfirst($user['status'])); ?></span></td>
+                            <td style="white-space:nowrap;color:var(--text-secondary);"><?php echo date('d M Y', strtotime($user['created_at'])); ?></td>
+                        </tr>
+                    <?php endforeach; endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -148,13 +167,16 @@ foreach ($sa_metrics as [$icon, $color, $val, $label, $sub]): ?>
     </div>
 </div>
 
-<!-- SaaS Placeholder notice -->
-<div class="mt-4 p-4" style="background:var(--bg-surface);border:1px dashed var(--border-color);border-radius:var(--radius-lg);text-align:center;">
-    <i class="fas fa-rocket fa-2x mb-2" style="color:var(--primary);"></i>
-    <h6 style="font-weight:700;">SaaS Tenant Management — Coming Soon</h6>
-    <p class="text-muted mb-0" style="font-size:.85rem;">
-        Multi-tenant support, subscription billing, tenant isolation, and usage analytics will live here.
-    </p>
+<div class="sc mt-3">
+    <div class="sc-body">
+        <div class="sa-note">
+            <div class="sa-note-icon"><i class="fas fa-building"></i></div>
+            <div>
+                <h6>SaaS tenant management</h6>
+                <p>Multi-tenant support, subscription billing, tenant isolation and usage analytics are planned for this platform area.</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <?php

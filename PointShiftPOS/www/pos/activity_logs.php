@@ -3,11 +3,13 @@
  * Activity logs — system-wide audit trail. Admin and super admin only.
  */
 require_once __DIR__ . '/config.php';
-User::requireLogin();
-if (!User::isAdmin()) {
-    header('Location: ../dashboard.php');
-    exit();
+$isSuperAdmin = User::isSuperAdmin();
+if ($isSuperAdmin) {
+    User::requireSuperAdmin();
+} else {
+    User::requireAdmin();
 }
+$logsUrl = $isSuperAdmin ? SITE_URL . '/superadmin/logs.php' : SITE_URL . '/activity_logs.php';
 
 $db = Database::getInstance()->getConnection();
 
@@ -139,7 +141,7 @@ ob_start();
     <div class="logs-kpi"><div class="lbl">Approvals today</div><div class="val"><?php echo $stats['approvals']; ?></div></div>
 </div>
 
-<form class="logs-filter" method="GET" action="activity_logs.php">
+<form class="logs-filter" method="GET" action="<?php echo htmlspecialchars($logsUrl); ?>">
     <div class="f">
         <label for="category">Category</label>
         <select name="category" id="category">
@@ -167,7 +169,7 @@ ob_start();
     </div>
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filter</button>
-        <a class="btn btn-outline-secondary btn-sm" href="activity_logs.php">Reset</a>
+        <a class="btn btn-outline-secondary btn-sm" href="<?php echo htmlspecialchars($logsUrl); ?>">Reset</a>
     </div>
 </form>
 
@@ -215,4 +217,6 @@ ob_start();
 
 <?php
 $content = ob_get_clean();
-include __DIR__ . '/admin/views/layouts/main.php';
+include $isSuperAdmin
+    ? __DIR__ . '/superadmin/views/layouts/main.php'
+    : __DIR__ . '/admin/views/layouts/main.php';
